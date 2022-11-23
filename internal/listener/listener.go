@@ -2,8 +2,8 @@ package listener
 
 import (
 	"log"
-	"net"
 
+	"github.com/bwoff11/go-net-stab/internal/registry"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -11,7 +11,7 @@ import (
 func Start() error {
 	connection, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	go func() {
@@ -28,18 +28,22 @@ func Start() error {
 			}
 
 			switch message.Type {
+
 			case ipv4.ICMPTypeEchoReply:
-				handleEchoReply(message, host.(*net.IPAddr))
+				body := message.Body.(*icmp.Echo)
+				registry.HandleEchoReply(body.ID, body.Seq, host)
+
 			case ipv4.ICMPTypeDestinationUnreachable:
-				handleDestinationUnreachableReply(message, host.(*net.IPAddr))
+				//handleDestinationUnreachableReply(message, host.(*net.IPAddr))
 			default:
-				log.Println("Received unknown response")
+				log.Println("Received unknown message type", message.Type)
 			}
 		}
 	}()
 	return nil
 }
 
+/*
 func handleEchoReply(message *icmp.Message, host *net.IPAddr) {
 	// TODO: Add check for reply to timed-out packet
 
@@ -47,13 +51,13 @@ func handleEchoReply(message *icmp.Message, host *net.IPAddr) {
 	log.Printf("Received response from %s with id %d and sequence %d", host, body.ID, body.Seq)
 
 	// Search outstanding pings for a match
-	//for _, ping := range outstandingPings {
-	//	if ping.PingerID == body.ID && ping.Sequence == body.Seq {
-	//handlePingMatch(ping)
-	//		return
-	//	}
-	//}
-}
+	for _, ping := range outstandingPings {
+		if ping.PingerID == body.ID && ping.Sequence == body.Seq {
+			//handlePingMatch(ping)
+			return
+		}
+	}
+}*/
 
 /*
 func handlePingMatch(ping Ping) {
@@ -77,6 +81,3 @@ func handlePingMatch(ping Ping) {
 		}
 	}
 }*/
-
-func handleDestinationUnreachableReply(message *icmp.Message, host *net.IPAddr) {
-}

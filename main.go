@@ -5,10 +5,10 @@ import (
 
 	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/bwoff11/go-net-stab/internal/listener"
+	"github.com/bwoff11/go-net-stab/internal/pingers"
+	"github.com/bwoff11/go-net-stab/internal/registry"
 	"github.com/bwoff11/go-net-stab/internal/reporting"
 )
-
-var pingers []Pinger
 
 func main() {
 	if err := config.LoadConfig(); err != nil {
@@ -17,25 +17,11 @@ func main() {
 	if err := listener.Start(); err != nil {
 		log.Fatal("Failed to start listener:", err)
 	}
-	createSentPingsChannel()
-	createPingers()
-
-	for i := range pingers {
-		go pingers[i].Run(config.Config.Interval)
+	if err := registry.Start(); err != nil {
+		log.Fatal("Failed to start registry:", err)
 	}
-
+	if err := pingers.Start(); err != nil {
+		log.Fatal("Failed to start pingers:", err)
+	}
 	reporting.ServeMetrics()
-}
-
-func createPingers() {
-	var id int
-	for _, endpoint := range config.Config.Endpoints {
-		pingers = append(pingers, Pinger{
-			ID:            id,
-			SourceIP:      "192.168.1.11",
-			DestinationIP: endpoint,
-		})
-		log.Println("Created new pinger for", endpoint, "with ID", id)
-		id++
-	}
 }

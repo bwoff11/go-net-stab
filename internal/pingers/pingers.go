@@ -1,9 +1,11 @@
-package main
+package pingers
 
 import (
+	"log"
 	"net"
 	"time"
 
+	"github.com/bwoff11/go-net-stab/internal/config"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -16,22 +18,41 @@ type Pinger struct {
 	Connection    *icmp.PacketConn
 }
 
-func (p *Pinger) Run(interval int) {
-	p.CreateConnection()
+var pingers []Pinger
+
+func Start() error {
+	createPingers()
+	for _, pinger := range pingers {
+		go pinger.Start()
+	}
+}
+
+func createPingers() {
+	var id int
+	for _, endpoint := range config.Config.Endpoints {
+		pingers = append(pingers, Pinger{
+			ID:            id,
+			SourceIP:      "192.168.1.11",
+			DestinationIP: endpoint,
+		})
+		log.Println("Created new pinger for", endpoint, "with ID", id)
+		id++
+	}
+}
+
+func (p *Pinger) Start() {
+	conn, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
+	if err != nil {
+		panic(err)
+	}
+	p.Connection = conn
+
 	for {
 		payload := p.CreatePayload()
 		p.SendPing(payload)
 		p.Sequence++
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
-}
-
-func (p *Pinger) CreateConnection() {
-	conn, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
-	if err != nil {
-		panic(err)
-	}
-	p.Connection = conn
 }
 
 func (p *Pinger) CreatePayload() []byte {
