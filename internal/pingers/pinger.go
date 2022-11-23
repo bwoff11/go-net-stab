@@ -72,7 +72,7 @@ func (p *Pinger) SendPing(payload []byte) {
 		log.Println("Error sending ping:", err)
 	}
 	registry.SentPings <- newPing
-	reporting.SendPacketCounter.With(
+	reporting.SentPacketCounter.With(
 		prometheus.Labels{
 			"source_ip":      p.SourceIP,
 			"destination_ip": p.DestinationIP,

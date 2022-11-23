@@ -2,7 +2,6 @@ package registry
 
 import (
 	"log"
-	"net"
 	"time"
 
 	"github.com/bwoff11/go-net-stab/internal/reporting"
@@ -10,53 +9,59 @@ import (
 )
 
 var SentPings chan Ping
-var outstandingPings []Ping
+var pending []Ping
 
 func Start() error {
 
-	// Monitor the sentPings channel and import any new pings into the outstandingPings slice
+	startPendingImporter()
+	startLostPingChecker()
+
+	log.Println("Registry successfully started and is now waiting for pings from pingers")
+	return nil
+}
+
+func startPendingImporter() {
 	SentPings = make(chan Ping)
 	go func() {
 		for {
 			ping := <-SentPings
-			outstandingPings = append(outstandingPings, ping)
+			pending = append(pending, ping)
 		}
 	}()
-
-	log.Println("Registry successfully started and waiting for pings")
-	return nil
 }
 
-func HandleEchoReply(pingerID int, sequence int, host net.Addr) {
-	// TODO: Add check for reply to timed-out packet
-
-	// Search outstanding pings for a match
-	for _, ping := range outstandingPings {
-		if ping.PingerID == pingerID && ping.Sequence == sequence {
-			handlePingMatch(ping)
-			return
+func startLostPingChecker() {
+	go func() {
+		for {
+			for _, ping := range pending {
+				if ping.IsLost() {
+					handleLostPing(ping)
+				}
+			}
+			time.Sleep(1 * time.Second)
 		}
-	}
+	}()
 }
 
-func handlePingMatch(ping Ping) {
-	now := time.Now()
-	ping.ReceivedAt = &now
-	rtt := float64(ping.CalculateRoundTripTime().Milliseconds())
-
-	reporting.RttGauge.With(
+func handleLostPing(ping Ping) {
+	log.Println("Lost ping:", ping)
+	reporting.LostPacketCounter.With(
 		prometheus.Labels{
 			"source_ip":      ping.SourceIP,
 			"destination_ip": ping.DestinationIP,
 		},
-	).Set(rtt)
-	log.Println("RTT:", rtt)
+	).Inc()
 
 	// Remove ping from outstanding pings
-	for i, p := range outstandingPings {
-		if p == ping {
-			outstandingPings = append(outstandingPings[:i], outstandingPings[i+1:]...)
-			return
+	var removed bool
+	for i, p := range pending {
+		if p.PingerID == ping.PingerID && p.Sequence == ping.Sequence {
+			pending = append(pending[:i], pending[i+1:]...)
+			removed = true
+			break
 		}
+	}
+	if !removed {
+		log.Println("Failed to remove ping from pending pings")
 	}
 }

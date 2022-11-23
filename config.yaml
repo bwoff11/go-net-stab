@@ -2,6 +2,9 @@
 interval: 1
 # Time in seconds before a ping with no response is considered lost
 timeout: 3
+# Number of packets to consider for calculation of metrics (min, max, avg, jit, loss)
+history: 100
+# List of hosts to ping
 endpoints:
   #- 1.1.1.1 # Cloudflare
   - 8.8.8.8 # Google DNS

@@ -8,25 +8,34 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var SendPacketCounter = prometheus.NewCounterVec(
+var SentPacketCounter = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "send_packet_total",
+		Name: "ping_set_packet_total",
 		Help: "Total number of packets sent",
+	},
+	[]string{"source_ip", "destination_ip"},
+)
+
+var LostPacketCounter = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "ping_lost_packet_total",
+		Help: "Total number of packets lost",
 	},
 	[]string{"source_ip", "destination_ip"},
 )
 
 var RttGauge = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "rtt",
+		Name: "ping_rtt_milliseconds",
 		Help: "Round trip time in milliseconds",
 	},
 	[]string{"source_ip", "destination_ip"},
 )
 
 func ServeMetrics() {
+	prometheus.MustRegister(SentPacketCounter)
+	prometheus.MustRegister(LostPacketCounter)
 	prometheus.MustRegister(RttGauge)
-	prometheus.MustRegister(SendPacketCounter)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":3009", nil))
 }
