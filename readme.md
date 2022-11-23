@@ -1,4 +1,4 @@
-# go-net-stability
+# go-net-stab
 Golang Network Stability Monitor (or go-net-stab) aims to make it incredibly simple to monitor the stability of an enterprise network. It works by heavily utilizing the net/icmp package and goroutines to ping a list of hosts and report back the results which can then be scraped by Prometheus.
 
 ## Quickstart
