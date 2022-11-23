@@ -1,11 +1,11 @@
 # Time in seconds between each ping is sent
-interval: 5
+interval: 1
 # Time in seconds before a ping with no response is considered lost
 timeout: 3
 endpoints:
   - 1.1.1.1 # Cloudflare
   - 8.8.8.8 # Google DNS
-  - 8.8.4.4 # Google DNS
-  - 156.240.3.35 # Facebook
-  - 208.67.222.222 # Cisco OpenDNS
-  - 208.67.220.220 # Cisco OpenDNS
+  #- 8.8.4.4 # Google DNS
+  #- 156.240.3.35 # Facebook
+  #- 208.67.222.222 # Cisco OpenDNS
+  #- 208.67.220.220 # Cisco OpenDNS
