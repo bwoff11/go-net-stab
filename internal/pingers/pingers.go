@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bwoff11/go-net-stab/internal/config"
+	"github.com/bwoff11/go-net-stab/internal/registry"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -25,6 +26,8 @@ func Start() error {
 	for _, pinger := range pingers {
 		go pinger.Start()
 	}
+	log.Println("All pingers successfully created and started")
+	return nil
 }
 
 func createPingers() {
@@ -51,7 +54,7 @@ func (p *Pinger) Start() {
 		payload := p.CreatePayload()
 		p.SendPing(payload)
 		p.Sequence++
-		time.Sleep(time.Duration(interval) * time.Second)
+		time.Sleep(time.Duration(config.Config.Interval) * time.Second)
 	}
 }
 
@@ -72,7 +75,7 @@ func (p *Pinger) CreatePayload() []byte {
 }
 
 func (p *Pinger) SendPing(payload []byte) {
-	newPing := Ping{
+	newPing := registry.Ping{
 		PingerID:      p.ID,
 		SourceIP:      p.SourceIP,
 		DestinationIP: p.DestinationIP,
@@ -87,5 +90,5 @@ func (p *Pinger) SendPing(payload []byte) {
 		}); err != nil {
 		panic(err)
 	}
-	sentPings <- newPing
+	registry.SentPings <- newPing
 }

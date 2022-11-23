@@ -1,6 +1,10 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"log"
+
+	"github.com/spf13/viper"
+)
 
 type Configurcation struct {
 	Interval  int
@@ -32,5 +36,6 @@ func LoadConfig() error {
 		return err
 	}
 
+	log.Println("Configuration successfully loaded from", viper.ConfigFileUsed())
 	return nil
 }

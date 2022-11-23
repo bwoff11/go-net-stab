@@ -40,6 +40,7 @@ func Start() error {
 			}
 		}
 	}()
+	log.Println("Listener successfully started and waiting for ICMP messages")
 	return nil
 }
 

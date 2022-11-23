@@ -17,11 +17,11 @@ func main() {
 	if err := listener.Start(); err != nil {
 		log.Fatal("Failed to start listener:", err)
 	}
-	if err := registry.Start(); err != nil {
-		log.Fatal("Failed to start registry:", err)
-	}
 	if err := pingers.Start(); err != nil {
 		log.Fatal("Failed to start pingers:", err)
+	}
+	if err := registry.Start(); err != nil {
+		log.Fatal("Failed to start registry:", err)
 	}
 	reporting.ServeMetrics()
 }
