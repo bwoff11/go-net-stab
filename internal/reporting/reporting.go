@@ -11,7 +11,7 @@ import (
 
 var SentPacketCounter = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "ping_set_packet_total",
+		Name: "ping_sent_packet_total",
 		Help: "Total number of packets sent",
 	},
 	[]string{"source_ip", "destination_ip"},
