@@ -7,6 +7,8 @@ import (
 
 	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/bwoff11/go-net-stab/internal/registry"
+	"github.com/bwoff11/go-net-stab/internal/reporting"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -69,6 +71,11 @@ func (p *Pinger) SendPing(payload []byte) {
 		}); err != nil {
 		log.Println("Error sending ping:", err)
 	}
-	log.Println("Sent ping", newPing.Sequence, "from", newPing.SourceIP, "to", newPing.DestinationIP)
 	registry.SentPings <- newPing
+	reporting.SendPacketCounter.With(
+		prometheus.Labels{
+			"source_ip":      p.SourceIP,
+			"destination_ip": p.DestinationIP,
+		},
+	).Inc()
 }
