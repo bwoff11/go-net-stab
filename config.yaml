@@ -14,3 +14,5 @@ endpoints:
   - 156.240.3.35 # Facebook
   - 208.67.222.222 # Cisco OpenDNS
   - 208.67.220.220 # Cisco OpenDNS
+  - 85.117.240.9 # TF2 Server US
+  - 193.221.192.31 # TF2 Server UK
