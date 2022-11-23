@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,8 +36,8 @@ func createPingers() {
 	for _, endpoint := range config.Endpoints {
 		pingers = append(pingers, Pinger{
 			ID:            id,
-			SourceIP:      net.ParseIP("192.168.1.11"),
-			DestinationIP: net.ParseIP(endpoint),
+			SourceIP:      "192.168.1.11",
+			DestinationIP: endpoint,
 		})
 		log.Println("Created new pinger for", endpoint, "with ID", id)
 		id++

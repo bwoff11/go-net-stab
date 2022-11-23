@@ -1,20 +1,19 @@
 package main
 
 import (
-	"net"
 	"time"
 )
 
 type Ping struct {
 	PingerID      int
-	SourceIP      net.IP
-	DestinationIP net.IP
+	SourceIP      string
+	DestinationIP string
 	Sequence      int
 	SentAt        time.Time
 	ReceivedAt    *time.Time
 }
 
-func NewPing(pingerID int, sourceIP net.IP, destinationIP net.IP, sequence int) Ping {
+func NewPing(pingerID int, sourceIP string, destinationIP string, sequence int) Ping {
 	return Ping{
 		PingerID:      pingerID,
 		SourceIP:      sourceIP,

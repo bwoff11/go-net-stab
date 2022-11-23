@@ -74,9 +74,17 @@ func handlePingMatch(ping Ping) {
 
 	rttGauge.With(
 		prometheus.Labels{
-			"source_ip":      ping.SourceIP.String(),
-			"destination_ip": ping.DestinationIP.String(),
+			"source_ip":      ping.SourceIP,
+			"destination_ip": ping.DestinationIP,
 		},
 	).Set(rtt)
 	log.Println("RTT:", rtt)
+
+	// Remove ping from outstanding pings
+	for i, p := range outstandingPings {
+		if p == ping {
+			outstandingPings = append(outstandingPings[:i], outstandingPings[i+1:]...)
+			return
+		}
+	}
 }

@@ -10,8 +10,8 @@ import (
 
 type Pinger struct {
 	ID            int
-	SourceIP      net.IP
-	DestinationIP net.IP
+	SourceIP      string
+	DestinationIP string
 	Sequence      int
 	Connection    *icmp.PacketConn
 }
@@ -62,7 +62,7 @@ func (p *Pinger) SendPing(payload []byte) {
 	if _, err := p.Connection.WriteTo(
 		payload,
 		&net.IPAddr{
-			IP: newPing.DestinationIP,
+			IP: net.ParseIP(p.DestinationIP),
 		}); err != nil {
 		panic(err)
 	}
