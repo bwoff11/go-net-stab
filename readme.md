@@ -1,7 +1,13 @@
-#Not ready for use without heavy modification
+# go-net-stability
+Golang Network Stability Monitor (or go-net-stab) aims to make it incredibly simple to monitor the stability of an enterprise network. It works by heavily utilizing the net/icmp package and goroutines to ping a list of hosts and report back the results which can then be scraped by Prometheus.
 
-The application works by first creating a slice of pingers using the parameters and enpoints provided in the configuration file.
+## Quickstart
+```py
+git clone https://github.com/bwoff11/go-net-stab.git
+cd go-net-stab
+# Edit the config.yml file to include the hosts you want to monitor
+go run .
+```
 
-The pingers are started concurrently and are responsible for creating pings which are then passed to the connection manager via the pingOutbox channel.
-
-The connection manager is responsible for creating connections to the endpoints and sending the pings to the endpoints. The connection manager also receives the responses from the endpoints and passes them to the response handler via the responseInbox channel.
+## How it Works
+To be completed
