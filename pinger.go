@@ -59,7 +59,6 @@ func (p *Pinger) SendPing(payload []byte) {
 		SentAt:        time.Now(),
 		ReceivedAt:    nil,
 	}
-	sentPings <- newPing
 	if _, err := p.Connection.WriteTo(
 		payload,
 		&net.IPAddr{
@@ -67,4 +66,5 @@ func (p *Pinger) SendPing(payload []byte) {
 		}); err != nil {
 		panic(err)
 	}
+	sentPings <- newPing
 }

@@ -24,3 +24,10 @@ func NewPing(pingerID int, sourceIP net.IP, destinationIP net.IP, sequence int) 
 		ReceivedAt:    nil,
 	}
 }
+
+func (p *Ping) CalculateRoundTripTime() time.Duration {
+	if p.ReceivedAt == nil {
+		return 0
+	}
+	return p.ReceivedAt.Sub(p.SentAt)
+}

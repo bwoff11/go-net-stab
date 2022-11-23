@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -59,13 +60,24 @@ func handleEchoReply(message *icmp.Message, host *net.IPAddr) {
 	log.Printf("Received response from %s with id %d and sequence %d", host, body.ID, body.Seq)
 
 	// Search outstanding pings for a match
-	for i, ping := range outstandingPings {
+	for _, ping := range outstandingPings {
 		if ping.PingerID == body.ID && ping.Sequence == body.Seq {
-			receivedAt := time.Now()
-			ping.ReceivedAt = &receivedAt
-			outstandingPings = append(outstandingPings[:i], outstandingPings[i+1:]...)
-			log.Println("Matched! ID:", ping.PingerID, "Sequence:", ping.Sequence)
-			break
+			handlePingMatch(ping)
+			return
 		}
 	}
+}
+
+func handlePingMatch(ping Ping) {
+	now := time.Now()
+	ping.ReceivedAt = &now
+	rtt := float64(ping.CalculateRoundTripTime().Milliseconds())
+
+	rttGauge.With(
+		prometheus.Labels{
+			"source_ip":      ping.SourceIP.String(),
+			"destination_ip": ping.DestinationIP.String(),
+		},
+	).Set(rtt)
+	log.Println("RTT:", rtt)
 }

@@ -10,6 +10,15 @@ var packetLossGauge = prometheus.NewGaugeVec(
 	[]string{"source_ip", "destination_ip"},
 )
 
+var rttGauge = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "rtt",
+		Help: "Round trip time in milliseconds",
+	},
+	[]string{"source_ip", "destination_ip"},
+)
+
 func registerPrometheusMetrics() {
 	prometheus.MustRegister(packetLossGauge)
+	prometheus.MustRegister(rttGauge)
 }

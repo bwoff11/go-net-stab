@@ -22,12 +22,11 @@ func main() {
 	registerPrometheusMetrics()
 	readConfig()
 	createPingers()
+	startResponseHandler()
 
 	for i := range pingers {
 		go pingers[i].Run(config.Interval)
 	}
-
-	startResponseHandler()
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":3009", nil)
