@@ -21,6 +21,7 @@ func (p *Pinger) Run(interval int) {
 	for {
 		payload := p.CreatePayload()
 		p.SendPing(payload)
+		p.Sequence++
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
@@ -45,7 +46,6 @@ func (p *Pinger) CreatePayload() []byte {
 	if bytes, err := msg.Marshal(nil); err != nil {
 		panic(err)
 	} else {
-		p.Sequence++
 		return bytes
 	}
 }

@@ -19,7 +19,6 @@ func createSentPingsChannel() {
 		for {
 			ping := <-sentPings
 			outstandingPings = append(outstandingPings, ping)
-			log.Println("Sent ping with sequence", ping.Sequence)
 		}
 	}()
 }
