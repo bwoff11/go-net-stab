@@ -22,6 +22,7 @@ func Start() error {
 			outstandingPings = append(outstandingPings, ping)
 		}
 	}()
+
 	log.Println("Registry successfully started and waiting for pings")
 	return nil
 }
