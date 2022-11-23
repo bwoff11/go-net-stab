@@ -28,5 +28,5 @@ func ServeMetrics() {
 	prometheus.MustRegister(RttGauge)
 	prometheus.MustRegister(HostUnreachableCounter)
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":2112", nil))
+	log.Fatal(http.ListenAndServe(":3009", nil))
 }
