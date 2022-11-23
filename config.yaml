@@ -1,4 +1,4 @@
-interval: 1
+interval: 5
 endpoints:
   - 8.8.8.8
   - 8.8.4.4

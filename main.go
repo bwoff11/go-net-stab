@@ -4,27 +4,23 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/spf13/viper"
 )
 
-type Config struct {
-	Interval  int
-	Endpoints []string
-}
-
-var config Config
 var pingers []Pinger
 
 func main() {
+	if err := config.LoadConfig(); err != nil {
+		log.Fatal("Failed to load config:", err)
+	}
 	createSentPingsChannel()
 	registerPrometheusMetrics()
-	readConfig()
 	createPingers()
 	startResponseHandler()
 
 	for i := range pingers {
-		go pingers[i].Run(config.Interval)
+		go pingers[i].Run(config.Config.Interval)
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -33,7 +29,7 @@ func main() {
 
 func createPingers() {
 	var id int
-	for _, endpoint := range config.Endpoints {
+	for _, endpoint := range config.Config.Endpoints {
 		pingers = append(pingers, Pinger{
 			ID:            id,
 			SourceIP:      "192.168.1.11",
@@ -41,18 +37,5 @@ func createPingers() {
 		})
 		log.Println("Created new pinger for", endpoint, "with ID", id)
 		id++
-	}
-}
-
-func readConfig() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-
-	if err := viper.ReadInConfig(); err != nil {
-		panic(err)
-	}
-
-	if err := viper.Unmarshal(&config); err != nil {
-		panic(err)
 	}
 }
