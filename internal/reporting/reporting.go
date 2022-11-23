@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -37,5 +38,5 @@ func ServeMetrics() {
 	prometheus.MustRegister(LostPacketCounter)
 	prometheus.MustRegister(RttGauge)
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":3009", nil))
+	log.Fatal(http.ListenAndServe(":"+config.Config.Port, nil))
 }

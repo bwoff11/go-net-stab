@@ -10,6 +10,7 @@ type Configurcation struct {
 	Interval  int
 	Timeout   int
 	Endpoints []string
+	Port      string
 }
 
 var Config Configurcation

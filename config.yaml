@@ -4,6 +4,8 @@ interval: 1
 timeout: 3
 # Number of packets to consider for calculation of metrics (min, max, avg, jit, loss)
 history: 100
+# Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
+port: 3009
 # List of hosts to ping
 endpoints:
   #- 1.1.1.1 # Cloudflare
