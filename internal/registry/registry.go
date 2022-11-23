@@ -3,10 +3,13 @@ package registry
 import (
 	"log"
 	"time"
-
-	"github.com/bwoff11/go-net-stab/internal/reporting"
-	"github.com/prometheus/client_golang/prometheus"
 )
+
+type Registry struct {
+	PingsSent       chan Ping
+	PingsPending    []Ping
+	PingsHistorical []Ping
+}
 
 var SentPings chan Ping
 var pending []Ping
@@ -41,27 +44,4 @@ func startLostPingChecker() {
 			time.Sleep(1 * time.Second)
 		}
 	}()
-}
-
-func handleLostPing(ping Ping) {
-	log.Println("Lost ping:", ping)
-	reporting.LostPacketCounter.With(
-		prometheus.Labels{
-			"source_ip":      ping.SourceIP,
-			"destination_ip": ping.DestinationIP,
-		},
-	).Inc()
-
-	// Remove ping from outstanding pings
-	var removed bool
-	for i, p := range pending {
-		if p.PingerID == ping.PingerID && p.Sequence == ping.Sequence {
-			pending = append(pending[:i], pending[i+1:]...)
-			removed = true
-			break
-		}
-	}
-	if !removed {
-		log.Println("Failed to remove ping from pending pings")
-	}
 }
