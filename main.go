@@ -2,10 +2,10 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/bwoff11/go-net-stab/internal/config"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/bwoff11/go-net-stab/internal/listener"
+	"github.com/bwoff11/go-net-stab/internal/reporting"
 )
 
 var pingers []Pinger
@@ -14,17 +14,17 @@ func main() {
 	if err := config.LoadConfig(); err != nil {
 		log.Fatal("Failed to load config:", err)
 	}
+	if err := listener.Start(); err != nil {
+		log.Fatal("Failed to start listener:", err)
+	}
 	createSentPingsChannel()
-	registerPrometheusMetrics()
 	createPingers()
-	startResponseHandler()
 
 	for i := range pingers {
 		go pingers[i].Run(config.Config.Interval)
 	}
 
-	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":3009", nil)
+	reporting.ServeMetrics()
 }
 
 func createPingers() {

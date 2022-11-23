@@ -4,6 +4,7 @@ import "github.com/spf13/viper"
 
 type Configurcation struct {
 	Interval  int
+	Timeout   int
 	Endpoints []string
 }
 

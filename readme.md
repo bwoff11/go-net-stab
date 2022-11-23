@@ -1,3 +1,5 @@
+#Not ready for use without heavy modification
+
 The application works by first creating a slice of pingers using the parameters and enpoints provided in the configuration file.
 
 The pingers are started concurrently and are responsible for creating pings which are then passed to the connection manager via the pingOutbox channel.
