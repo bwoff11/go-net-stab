@@ -32,16 +32,11 @@ func Start() error {
 			case ipv4.ICMPTypeEchoReply:
 				body := message.Body.(*icmp.Echo)
 				registry.HandleEchoReply(body.ID, body.Seq, host)
+
 			case ipv4.ICMPTypeDestinationUnreachable:
-				registry.HandleDestinationUnreachableReply(host)
-			case ipv4.ICMPTypeTimeExceeded:
-				registry.HandleTimeExceededReply(host)
+				//handleDestinationUnreachableReply(message, host.(*net.IPAddr))
 			default:
 				log.Println("Received unknown message type", message.Type)
-				body := message.Body.(*icmp.Echo)
-				log.Println("ID:", body.ID)
-				log.Println("Seq:", body.Seq)
-				log.Println("Data:", body.Data)
 			}
 		}
 	}()

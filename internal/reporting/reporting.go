@@ -17,22 +17,6 @@ var SentPacketCounter = prometheus.NewCounterVec(
 	[]string{"source_ip", "destination_ip"},
 )
 
-var DestinationUnreachableCounter = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "ping_destination_unreachable_total",
-		Help: "Total number of destination unreachable packets received",
-	},
-	[]string{"source_ip", "destination_ip"},
-)
-
-var TimeExceededCounter = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "ping_time_exceeded_total",
-		Help: "Total number of time exceeded packets received",
-	},
-	[]string{"source_ip", "destination_ip"},
-)
-
 var LostPacketCounter = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "ping_lost_packet_total",
@@ -51,8 +35,6 @@ var RttGauge = prometheus.NewGaugeVec(
 
 func ServeMetrics() {
 	prometheus.MustRegister(SentPacketCounter)
-	prometheus.MustRegister(DestinationUnreachableCounter)
-	prometheus.MustRegister(TimeExceededCounter)
 	prometheus.MustRegister(LostPacketCounter)
 	prometheus.MustRegister(RttGauge)
 	http.Handle("/metrics", promhttp.Handler())

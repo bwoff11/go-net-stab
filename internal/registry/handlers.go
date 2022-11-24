@@ -32,36 +32,16 @@ func handleLostPing(ping Ping) {
 	}
 }
 
-func HandleDestinationUnreachableReply(destinationIP net.Addr) {
-	log.Println("Destination unreachable to ", destinationIP)
-	reporting.DestinationUnreachableCounter.With(
-		prometheus.Labels{
-			"source_ip":      "192.168.1.11",
-			"destination_ip": destinationIP.String(),
-		},
-	).Inc()
-}
-
-func HandleTimeExceededReply(destinationIP net.Addr) {
-	log.Println("Time exceeded to:", destinationIP)
-	reporting.TimeExceededCounter.With(
-		prometheus.Labels{
-			"source_ip":      "192.168.1.11",
-			"destination_ip": destinationIP.String(),
-		},
-	).Inc()
-}
-
 func HandleEchoReply(pingerID int, sequence int, host net.Addr) {
 	// TODO: Add check for reply to timed-out packet
-	ping := FindPing(pingerID, sequence)
-	if ping == nil {
-		log.Println("Failed to find ping for reply")
-		return
-	}
-	RemovePing(ping)
 
-	handlePingMatch(*ping)
+	// Search pending pings for a match
+	for _, ping := range pending {
+		if ping.PingerID == pingerID && ping.Sequence == sequence {
+			handlePingMatch(ping)
+			return
+		}
+	}
 }
 
 func handlePingMatch(ping Ping) {
@@ -76,18 +56,8 @@ func handlePingMatch(ping Ping) {
 		},
 	).Set(rtt)
 	log.Println("RTT:", rtt)
-}
 
-func FindPing(pingerID int, sequence int) *Ping {
-	for _, ping := range pending {
-		if ping.PingerID == pingerID && ping.Sequence == sequence {
-			return &ping
-		}
-	}
-	return nil
-}
-
-func RemovePing(ping *Ping) {
+	// Remove ping from outstanding pings
 	var removed bool
 	for i, p := range pending {
 		if p.PingerID == ping.PingerID && p.Sequence == ping.Sequence {

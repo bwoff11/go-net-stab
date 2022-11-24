@@ -31,6 +31,3 @@ Probably the most significant package, the registry is responsible for ingesting
 ### Reporting
 
 The reporting package is responsible for exposing the metrics for the other packages to submit data to, as well as hosting a simple web server for Prometheus to scrape the metrics from.
-
-## Other Notes
-- All replies aside from ICMP Echo Replies are counted as lost packets.
