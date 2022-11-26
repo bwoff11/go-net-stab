@@ -30,14 +30,6 @@ func (p *Ping) LogData() {
 }
 
 func (p *Ping) Send(conn *icmp.PacketConn, sequence int) error {
-	p.SentAt = time.Now()
-	if _, err := conn.WriteTo(p.CreatePacket(sequence), &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (p *Ping) CreatePacket(sequence int) []byte {
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho, Code: 0,
 		Body: &icmp.Echo{
@@ -46,16 +38,17 @@ func (p *Ping) CreatePacket(sequence int) []byte {
 			Data: []byte("We've been trying to reach you about your car's extended warranty"),
 		},
 	}
-	if bytes, err := msg.Marshal(nil); err != nil {
+	bytes, err := msg.Marshal(nil)
+	if err != nil {
 		log.Fatalln("Error marshalling payload:", err)
 		return nil
-	} else {
-		return bytes
 	}
-}
 
-func (p *Ping) SetSent() {
 	p.SentAt = time.Now()
+	if _, err := conn.WriteTo(bytes, &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p *Ping) SetReceived() {
