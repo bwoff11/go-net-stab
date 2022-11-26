@@ -30,6 +30,7 @@ func Start() error {
 			switch message.Type {
 
 			case ipv4.ICMPTypeEchoReply:
+				log.Println("desu2")
 				body := message.Body.(*icmp.Echo)
 				registry.HandleEchoReply(body.ID, body.Seq, host)
 			default:

@@ -5,7 +5,6 @@ import (
 
 	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/bwoff11/go-net-stab/internal/listener"
-	"github.com/bwoff11/go-net-stab/internal/pingers"
 	"github.com/bwoff11/go-net-stab/internal/registry"
 	"github.com/bwoff11/go-net-stab/internal/reporting"
 )
@@ -17,11 +16,12 @@ func main() {
 	if err := listener.Start(); err != nil {
 		log.Fatal("Failed to start listener:", err)
 	}
-	if err := pingers.Start(); err != nil {
-		log.Fatal("Failed to start pingers:", err)
+
+	registry := registry.Create()
+	for _, endpoint := range config.Config.Endpoints {
+		registry.AddEndpoint(endpoint)
 	}
-	if err := registry.Start(); err != nil {
-		log.Fatal("Failed to start registry:", err)
-	}
+	registry.Run()
+
 	reporting.ServeMetrics()
 }

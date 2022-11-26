@@ -3,45 +3,47 @@ package registry
 import (
 	"log"
 	"time"
+
+	"golang.org/x/net/icmp"
 )
 
 type Registry struct {
-	PingsSent       chan Ping
-	PingsPending    []Ping
-	PingsHistorical []Ping
+	Endpoints     []string
+	PingsSent     []Ping
+	PingsRecieved []Ping
+	HistorySize   int
+	Connection    *icmp.PacketConn
 }
 
-var SentPings chan Ping
-var pending []Ping
+func Create() Registry {
+	conn, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
+	if err != nil {
+		log.Fatal("Failed to listen for ICMP packets:", err)
+	}
+	//defer conn.Close()
 
-func Start() error {
-
-	startPendingImporter()
-	startLostPingChecker()
-
-	log.Println("Registry successfully started and is now waiting for pings from pingers")
-	return nil
+	return Registry{
+		PingsSent:     make([]Ping, 0),
+		PingsRecieved: make([]Ping, 0),
+		HistorySize:   100,
+		Connection:    conn,
+	}
 }
 
-func startPendingImporter() {
-	SentPings = make(chan Ping)
+func (r *Registry) AddEndpoint(endpoint string) {
+	r.Endpoints = append(r.Endpoints, endpoint)
+}
+
+func (r *Registry) Run() {
 	go func() {
 		for {
-			ping := <-SentPings
-			pending = append(pending, ping)
-		}
-	}()
-}
-
-func startLostPingChecker() {
-	go func() {
-		for {
-			for _, ping := range pending {
-				if ping.IsLost() {
-					handleLostPing(ping)
-				}
+			for _, endpoint := range r.Endpoints {
+				ping := CreatePing(endpoint)
+				ping.LogData()
+				ping.Send(r.Connection, 1)
+				r.PingsSent = append(r.PingsSent, ping)
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(3 * time.Second)
 		}
 	}()
 }
