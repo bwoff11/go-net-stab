@@ -63,6 +63,7 @@ func handlePingMatch(ping Ping) {
 		if p.PingerID == ping.PingerID && p.Sequence == ping.Sequence {
 			pending = append(pending[:i], pending[i+1:]...)
 			removed = true
+			log.Println("Size of pending pings:", len(pending))
 			break
 		}
 	}

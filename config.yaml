@@ -1,5 +1,5 @@
 # Time in seconds between each ping is sent
-interval: 1
+interval: 5
 # Time in seconds before a ping with no response is considered lost
 timeout: 3
 # Number of packets to consider for calculation of metrics (min, max, avg, jit, loss)
