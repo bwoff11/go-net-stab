@@ -217,16 +217,29 @@ func createListener() {
 	}()
 }
 
+// Check the pending queue for any ping that is exceeding the timeout value.
+// If so, increment the lost pings counter and remove from pending.
 func checkForLostPings() {
-
 	ticker := time.NewTicker(1 * time.Second)
-
 	go func() {
 		for {
 			<-ticker.C
 			for _, ping := range pending {
 				if time.Since(ping.SentAt) > time.Duration(config.Timeout)*time.Second {
 					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
+
+					// Increment lost pings counter
+					LostPingsCounter.With(
+						prometheus.Labels{
+							"source_hostname":      config.Localhost,
+							"destination_hostname": config.Endpoints[ping.ID].Hostname,
+							"destination_address":  config.Endpoints[ping.ID].Address,
+							"destination_location": config.Endpoints[ping.ID].Location,
+						},
+					).Inc()
+
+					// Remove from pending
+					pending = append(pending[:ping.ID], pending[ping.ID+1:]...)
 				}
 			}
 		}
