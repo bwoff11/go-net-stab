@@ -11,29 +11,29 @@ import (
 )
 
 type Ping struct {
+	EndpointID    int
 	Sequence      int
 	SourceIP      string
 	DestinationIP string
 	SentAt        time.Time
 	ReceivedAt    *time.Time
+	RoundTripTime float64
 }
 
-func CreatePing(destinationIP string) Ping {
+func CreatePing(endpointID int, sequence int, destinationIP string) Ping {
 	return Ping{
+		EndpointID:    endpointID,
+		Sequence:      sequence,
 		SourceIP:      "192.168.1.11",
 		DestinationIP: destinationIP,
 	}
 }
 
-func (p *Ping) LogData() {
-	log.Println("Sent ping:", p)
-}
-
-func (p *Ping) Send(conn *icmp.PacketConn, sequence int) error {
+func (p *Ping) Send(conn *icmp.PacketConn) error {
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho, Code: 0,
 		Body: &icmp.Echo{
-			ID:   0,
+			ID:   p.EndpointID,
 			Seq:  p.Sequence,
 			Data: []byte("We've been trying to reach you about your car's extended warranty"),
 		},
@@ -44,16 +44,12 @@ func (p *Ping) Send(conn *icmp.PacketConn, sequence int) error {
 		return nil
 	}
 
-	p.SentAt = time.Now()
 	if _, err := conn.WriteTo(bytes, &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
 		return err
 	}
-	return nil
-}
+	p.SentAt = time.Now()
 
-func (p *Ping) SetReceived() {
-	now := time.Now()
-	p.ReceivedAt = &now
+	return nil
 }
 
 func (p *Ping) CalculateRoundTripTime() time.Duration {
