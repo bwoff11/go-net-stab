@@ -63,6 +63,14 @@ func (r *Registry) StartLostPingWatcher() error {
 				if ping.IsLost() {
 					log.Println("Ping", ping.Sequence, "to", ping.DestinationIP, "is lost")
 					r.RemovePingFromSent(ping)
+
+					// Update metrics
+					reporting.LostPingsCounter.With(
+						prometheus.Labels{
+							"source_ip":      ping.SourceIP,
+							"destination_ip": ping.DestinationIP,
+						},
+					).Inc()
 				}
 			}
 		}
@@ -111,7 +119,7 @@ func (r *Registry) StartListener() error {
 			case ipv4.ICMPTypeEchoReply:
 				r.HandleEchoReply(message, host.String())
 			default:
-				log.Println("Received unknown message type", message.Type)
+				//log.Println("Received unknown message type", message.Type)
 			}
 		}
 	}()
@@ -120,22 +128,12 @@ func (r *Registry) StartListener() error {
 }
 
 func (r *Registry) HandleEchoReply(message *icmp.Message, host string) {
-
-	// Find the ping that matches the reply
-	body := message.Body.(*icmp.Echo)
-	ping := r.FindSentPing(int(body.ID), int(body.Seq))
+	ping := r.MatchReplyMessageToSentPing(message)
 	if ping == nil {
 		log.Println("Received unexpected ping:", ping)
 	}
-
-	// Update the registry and ping
 	ping.SetAsRecieved()
-	if err := r.RemovePingFromSent(*ping); err != nil {
-		log.Fatal("Failed to remove ping from sent:", err)
-	}
-	if err := r.AddPingToRecieved(*ping); err != nil {
-		log.Fatal("Failed to add ping to recieved:", err)
-	}
+	r.MoveFromSentToRecieved(*ping)
 
 	// Update metrics
 	reporting.RttGauge.With(
@@ -146,11 +144,25 @@ func (r *Registry) HandleEchoReply(message *icmp.Message, host string) {
 	).Set(ping.RoundTripTime)
 }
 
-func (r *Registry) FindSentPing(id int, seq int) *Ping {
+func (r *Registry) MatchReplyMessageToSentPing(message *icmp.Message) *Ping {
+	body := message.Body.(*icmp.Echo)
+	id := int(body.ID)
+	seq := int(body.Seq)
+
 	for _, ping := range r.PingsSent {
 		if ping.EndpointID == id && ping.Sequence == seq {
 			return &ping
 		}
+	}
+	return nil
+}
+
+func (r *Registry) MoveFromSentToRecieved(ping Ping) error {
+	if err := r.RemovePingFromSent(ping); err != nil {
+		return err
+	}
+	if err := r.AddPingToRecieved(ping); err != nil {
+		return err
 	}
 	return nil
 }

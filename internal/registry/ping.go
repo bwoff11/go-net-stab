@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/bwoff11/go-net-stab/internal/config"
+	"github.com/bwoff11/go-net-stab/internal/reporting"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -48,6 +50,14 @@ func (p *Ping) Send(conn *icmp.PacketConn) error {
 		return err
 	}
 	p.SentAt = time.Now()
+
+	// Update Metrics
+	reporting.SentPingsCounter.With(
+		prometheus.Labels{
+			"source_ip":      p.SourceIP,
+			"destination_ip": p.DestinationIP,
+		},
+	).Inc()
 
 	return nil
 }
