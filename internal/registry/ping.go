@@ -65,3 +65,9 @@ func (p *Ping) IsLost() bool {
 	timeOutstanding := now.Sub(p.SentAt)
 	return timeOutstanding > time.Duration(config.Config.Timeout)*time.Second
 }
+
+func (p *Ping) SetAsRecieved() {
+	now := time.Now()
+	p.ReceivedAt = &now
+	p.RoundTripTime = float64(p.CalculateRoundTripTime().Milliseconds())
+}

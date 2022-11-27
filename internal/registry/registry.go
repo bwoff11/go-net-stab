@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -96,21 +97,14 @@ func (r *Registry) HandleEchoReply(message *icmp.Message, host string) {
 
 	// Find the ping that matches the reply
 	body := message.Body.(*icmp.Echo)
-	id := int(body.ID)
-	seq := int(body.Seq)
-	ping := r.FindSentPing(id, seq)
+	ping := r.FindSentPing(int(body.ID), int(body.Seq))
 	if ping == nil {
 		log.Println("Received unexpected ping:", ping)
 	}
 
-	// Set the received time
-	now := time.Now()
-	ping.ReceivedAt = &now
-	ping.RoundTripTime = float64(ping.CalculateRoundTripTime().Milliseconds())
-
-	// Move from sent to received
-	r.RemoveFromSent(*ping)
-	r.PingsRecieved = append(r.PingsRecieved, *ping)
+	// Update the registry and ping
+	ping.SetAsRecieved()
+	r.MovePingFromSentToRecieved(*ping)
 
 	// Update metrics
 	reporting.RttGauge.With(
@@ -130,11 +124,29 @@ func (r *Registry) FindSentPing(id int, seq int) *Ping {
 	return nil
 }
 
-func (r *Registry) RemoveFromSent(ping Ping) {
-	for i, p := range r.PingsSent {
-		if p.EndpointID == ping.EndpointID && p.Sequence == ping.Sequence {
+func (r *Registry) MovePingFromSentToRecieved(ping Ping) {
+	if err := r.RemovePingFromSent(ping); err != nil {
+		log.Fatal("Failed to remove ping from sent:", err)
+	}
+	if err := r.AddPingToRecieved(ping); err != nil {
+		log.Fatal("Failed to add ping to recieved:", err)
+	}
+}
+
+func (r *Registry) RemovePingFromSent(p Ping) error {
+	for i, ping := range r.PingsSent {
+		if ping.EndpointID == p.EndpointID && ping.Sequence == p.Sequence {
 			r.PingsSent = append(r.PingsSent[:i], r.PingsSent[i+1:]...)
-			return
+			return nil
 		}
 	}
+	return errors.New("could not find ping to remove")
+}
+
+func (r *Registry) AddPingToRecieved(p Ping) error {
+	if len(r.PingsRecieved) == r.HistorySize {
+		r.PingsRecieved = r.PingsRecieved[1:]
+	}
+	r.PingsRecieved = append(r.PingsRecieved, p)
+	return nil
 }
