@@ -1,5 +1,5 @@
 # Time in seconds between each ping is sent
-interval: 1
+interval: 5
 # Time in seconds before a ping with no response is considered lost
 timeout: 3
 # Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
@@ -9,14 +9,34 @@ localhost: home
 # List of hosts to ping
 endpoints:
   - 
-    hostname: cloudflare
+    hostname: cloudflare_dns_1
     address: 1.1.1.1
     location: los_angeles_ca
+  -
+    hostname: cloudflare_dns_2
+    address: 1.0.0.1
+    location: los_angeles_ca
   - 
-    hostname: google_dns
+    hostname: google_dns_1
     address: 8.8.8.8
     location: mountain_view_ca
   -
-    hostname: google_dns2
+    hostname: google_dns_2
     address: 8.8.4.4
     location: mountain_view_ca
+  - 
+    hostname: open_dns_1
+    address: 208.67.222.222
+    location: san_francisco_ca
+  -
+    hostname: open_dns_2
+    address: 208.67.220.220
+    location: san_francisco_ca
+  -
+    hostname: cyber_ghost_dns_1
+    address: 38.132.106.139
+    location: new_york_ny
+  -
+    hostname: cyber_ghost_dns_2
+    address: 194.187.251.67
+    location: new_york_ny

@@ -40,7 +40,12 @@ var SentPingsCounter = prometheus.NewCounterVec(
 		Name: "ping_sent_packet_total",
 		Help: "Total number of packets sent",
 	},
-	[]string{"source_ip", "destination_ip"},
+	[]string{
+		"source_hostname",
+		"destination_hostname",
+		"destination_address",
+		"destination_location",
+	},
 )
 
 var LostPingsCounter = prometheus.NewCounterVec(
@@ -48,7 +53,12 @@ var LostPingsCounter = prometheus.NewCounterVec(
 		Name: "ping_lost_packet_total",
 		Help: "Total number of packets lost",
 	},
-	[]string{"source_ip", "destination_ip"},
+	[]string{
+		"source_hostname",
+		"destination_hostname",
+		"destination_address",
+		"destination_location",
+	},
 )
 
 var RttGauge = prometheus.NewGaugeVec(
@@ -170,6 +180,16 @@ func ping(id int, endpoint Endpoint) {
 				SentAt: time.Now(),
 			}
 
+			// Update metrics
+			SentPingsCounter.With(
+				prometheus.Labels{
+					"source_hostname":      config.Localhost,
+					"destination_hostname": endpoint.Hostname,
+					"destination_address":  endpoint.Address,
+					"destination_location": endpoint.Location,
+				},
+			).Inc()
+
 			// Increment sequence
 			sequence++
 		}
@@ -201,12 +221,13 @@ func createListener() {
 						rtt := time.Since(ping.SentAt).Milliseconds()
 
 						// Update metrics
-						SentPingsCounter.WithLabelValues(config.Localhost, config.Endpoints[ping.ID].Address).Inc()
-						RttGauge.WithLabelValues(
-							config.Localhost,
-							config.Endpoints[ping.ID].Hostname,
-							config.Endpoints[ping.ID].Address,
-							config.Endpoints[ping.ID].Location,
+						RttGauge.With(
+							prometheus.Labels{
+								"source_hostname":      config.Endpoints[ping.ID].Hostname,
+								"destination_hostname": config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname,
+								"destination_address":  config.Endpoints[rm.Body.(*icmp.Echo).ID].Address,
+								"destination_location": config.Endpoints[rm.Body.(*icmp.Echo).ID].Location,
+							},
 						).Set(float64(rtt))
 
 						log.Println("Received ping reply:", ping.ID, ping.Seq, "RTT:", rtt)
@@ -220,11 +241,11 @@ func createListener() {
 // Check the pending queue for any ping that is exceeding the timeout value.
 // If so, increment the lost pings counter and remove from pending.
 func checkForLostPings() {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	go func() {
 		for {
 			<-ticker.C
-			for _, ping := range pending {
+			for i, ping := range pending {
 				if time.Since(ping.SentAt) > time.Duration(config.Timeout)*time.Second {
 					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
 
@@ -239,7 +260,11 @@ func checkForLostPings() {
 					).Inc()
 
 					// Remove from pending
-					pending = append(pending[:ping.ID], pending[ping.ID+1:]...)
+					pending = append(pending[:i], pending[i+1:]...)
+
+					// Break here since removing from the slice will mess up the loop and cause a crash
+					// Interval should be fast enough even if all pings are lost so this should be fine for now
+					break
 				}
 			}
 		}
