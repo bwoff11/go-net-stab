@@ -214,6 +214,7 @@ func createListener() {
 				// Find matching pending ping
 				for i, ping := range pending {
 					if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
+
 						// Remove from pending
 						pending = append(pending[:i], pending[i+1:]...)
 
@@ -229,8 +230,6 @@ func createListener() {
 								"destination_location": config.Endpoints[rm.Body.(*icmp.Echo).ID].Location,
 							},
 						).Set(float64(rtt))
-
-						log.Println("Received ping reply:", ping.ID, ping.Seq, "RTT:", rtt)
 					}
 				}
 			}
