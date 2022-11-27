@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/bwoff11/go-net-stab/internal/config"
 	"github.com/bwoff11/go-net-stab/internal/reporting"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/icmp"
@@ -21,7 +22,7 @@ type Registry struct {
 }
 
 func Create() Registry {
-	conn, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		log.Fatal("Failed to listen for ICMP packets:", err)
 	}
@@ -46,7 +47,31 @@ func (r *Registry) Run() {
 	if err := r.StartListener(); err != nil {
 		log.Fatal("Failed to start listener:", err)
 	}
+	if err := r.StartEndpointPinger(); err != nil {
+		log.Fatal("Failed to start endpoint pinger:", err)
+	}
+	if err := r.StartLostPingWatcher(); err != nil {
+		log.Fatal("Failed to start lost ping watcher:", err)
+	}
+}
 
+func (r *Registry) StartLostPingWatcher() error {
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+			for _, ping := range r.PingsSent {
+				if ping.IsLost() {
+					log.Println("Ping", ping.Sequence, "to", ping.DestinationIP, "is lost")
+					r.RemovePingFromSent(ping)
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+func (r *Registry) StartEndpointPinger() error {
+	interval := config.Config.Interval
 	go func() {
 		for {
 			log.Println("Sending pings for sequence", r.Sequence)
@@ -56,13 +81,14 @@ func (r *Registry) Run() {
 				r.PingsSent = append(r.PingsSent, ping)
 			}
 			r.Sequence++
-			time.Sleep(3 * time.Second)
+			time.Sleep(time.Duration(interval) * time.Second)
 		}
 	}()
+	return nil
 }
 
 func (r *Registry) StartListener() error {
-	connection, err := icmp.ListenPacket("ip4:icmp", "192.168.1.11")
+	connection, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		return err
 	}
@@ -104,7 +130,12 @@ func (r *Registry) HandleEchoReply(message *icmp.Message, host string) {
 
 	// Update the registry and ping
 	ping.SetAsRecieved()
-	r.MovePingFromSentToRecieved(*ping)
+	if err := r.RemovePingFromSent(*ping); err != nil {
+		log.Fatal("Failed to remove ping from sent:", err)
+	}
+	if err := r.AddPingToRecieved(*ping); err != nil {
+		log.Fatal("Failed to add ping to recieved:", err)
+	}
 
 	// Update metrics
 	reporting.RttGauge.With(
@@ -122,15 +153,6 @@ func (r *Registry) FindSentPing(id int, seq int) *Ping {
 		}
 	}
 	return nil
-}
-
-func (r *Registry) MovePingFromSentToRecieved(ping Ping) {
-	if err := r.RemovePingFromSent(ping); err != nil {
-		log.Fatal("Failed to remove ping from sent:", err)
-	}
-	if err := r.AddPingToRecieved(ping); err != nil {
-		log.Fatal("Failed to add ping to recieved:", err)
-	}
 }
 
 func (r *Registry) RemovePingFromSent(p Ping) error {

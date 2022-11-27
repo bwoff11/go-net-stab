@@ -52,22 +52,20 @@ func (p *Ping) Send(conn *icmp.PacketConn) error {
 	return nil
 }
 
-func (p *Ping) CalculateRoundTripTime() time.Duration {
-	if p.ReceivedAt == nil {
-		return 0
-	}
-	return p.ReceivedAt.Sub(p.SentAt)
+func (p *Ping) SetAsRecieved() {
+	now := time.Now()
+	p.ReceivedAt = &now
+
+	rtt := now.Sub(p.SentAt)
+	p.RoundTripTime = float64(rtt.Milliseconds())
 }
 
 // Checks to see if the time since the ping was sent exceeds the configured timeout
 func (p *Ping) IsLost() bool {
+	if p.ReceivedAt != nil {
+		return false
+	}
 	now := time.Now()
 	timeOutstanding := now.Sub(p.SentAt)
 	return timeOutstanding > time.Duration(config.Config.Timeout)*time.Second
-}
-
-func (p *Ping) SetAsRecieved() {
-	now := time.Now()
-	p.ReceivedAt = &now
-	p.RoundTripTime = float64(p.CalculateRoundTripTime().Milliseconds())
 }
