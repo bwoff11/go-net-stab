@@ -4,11 +4,17 @@ interval: 1
 timeout: 3
 # Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
 port: 3009
+# Local node information for reporting to prometheus
+node:
+  hostname: "node1"
+  location: "home"
 # List of hosts to ping
 endpoints:
-  - 1.1.1.1 # Cloudflare
-  - 8.8.8.8 # Google DNS
-  - 8.8.4.4 # Google DNS
-  - 156.240.3.35 # Facebook
-  - 208.67.222.222 # Cisco OpenDNS
-  - 208.67.220.220 # Cisco OpenDNS
+  - 
+    hostname: cloudflare
+    address: 1.1.1.1
+    location: los_angeles_ca
+  - 
+    hostname: google_dns
+    address: 8.8.8.8
+    location: mountain_view_ca

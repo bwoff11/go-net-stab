@@ -38,7 +38,9 @@ func Create() {
 
 	// Add endpoints
 	for _, endpoint := range config.Config.Endpoints {
-		registry.AddEndpoint(endpoint)
+		len := len(registry.Endpoints)
+		registry.Endpoints[len] = endpoint.Address
+		log.Println("Added endpoint", endpoint, "with ID", len)
 	}
 }
 
@@ -52,12 +54,6 @@ func Start() {
 	if err := registry.StartLostPingWatcher(); err != nil {
 		log.Fatal("Failed to start lost ping watcher:", err)
 	}
-}
-
-func (r *Registry) AddEndpoint(endpoint string) {
-	len := len(r.Endpoints)
-	r.Endpoints[len] = endpoint
-	log.Println("Added endpoint", endpoint, "with ID", len)
 }
 
 func (r *Registry) StartLostPingWatcher() error {

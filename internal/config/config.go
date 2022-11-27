@@ -9,8 +9,14 @@ import (
 type Configurcation struct {
 	Interval  int
 	Timeout   int
-	Endpoints []string
 	Port      string
+	Endpoints []Endpoint
+}
+
+type Endpoint struct {
+	Hostname string
+	Address  string
+	Location string
 }
 
 var Config Configurcation
@@ -35,6 +41,10 @@ func LoadConfig() error {
 	}
 	if err := viper.Unmarshal(&Config); err != nil {
 		return err
+	}
+
+	for _, endpoint := range Config.Endpoints {
+		log.Println("Loaded endpoint", endpoint.Hostname, "at", endpoint.Address, "in", endpoint.Location)
 	}
 
 	log.Println("Configuration successfully loaded from", viper.ConfigFileUsed())
