@@ -144,7 +144,7 @@ func LoadConfig() error {
 func ping(id int, endpoint Endpoint) {
 
 	sequence := 0
-	tickerTime := time.Duration(config.Interval) * time.Second
+	tickerTime := time.Duration(config.Interval) * time.Millisecond
 	ticker := time.NewTicker(tickerTime)
 
 	go func() {
@@ -170,7 +170,8 @@ func ping(id int, endpoint Endpoint) {
 			// Send message
 			_, err = conn.WriteTo(b, &net.IPAddr{IP: net.ParseIP(endpoint.Address)})
 			if err != nil {
-				log.Fatal(err)
+				log.Println("Error sending ping to", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location, ":", err)
+				break
 			}
 
 			// Add to sent
@@ -192,6 +193,9 @@ func ping(id int, endpoint Endpoint) {
 
 			// Increment sequence
 			sequence++
+
+			// Log
+			log.Println("Sent ping to", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location)
 		}
 	}()
 }
@@ -230,6 +234,9 @@ func createListener() {
 								"destination_location": config.Endpoints[rm.Body.(*icmp.Echo).ID].Location,
 							},
 						).Set(float64(rtt))
+
+						// Log
+						log.Println("Received ping reply from", config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Address, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Location, "with RTT", rtt, "ms")
 					}
 				}
 			}
@@ -245,7 +252,7 @@ func checkForLostPings() {
 		for {
 			<-ticker.C
 			for i, ping := range pending {
-				if time.Since(ping.SentAt) > time.Duration(config.Timeout)*time.Second {
+				if time.Since(ping.SentAt) > time.Duration(config.Timeout)*time.Millisecond {
 					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
 
 					// Increment lost pings counter
