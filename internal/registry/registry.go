@@ -189,7 +189,6 @@ func (r *Registry) RemovePingFromPending(ping *Ping) {
 	for i, p := range r.PendingPings {
 		if p.Sequence == ping.Sequence && p.EndpointID == ping.EndpointID {
 			r.PendingPings = append(r.PendingPings[:i], r.PendingPings[i+1:]...)
-			log.Println("len(r.PendingPings)", len(r.PendingPings))
 			return
 		}
 	}
