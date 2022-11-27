@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"errors"
 	"log"
 	"time"
 
@@ -13,31 +12,31 @@ import (
 )
 
 type Registry struct {
-	Endpoints     map[int]string
-	PingsSent     []Ping
-	PingsRecieved []Ping
-	HistorySize   int
-	Sequence      int
-	Connection    *icmp.PacketConn
+	Endpoints    map[int]string
+	PendingPings []Ping
+	Sequence     int
+	Connection   *icmp.PacketConn
 }
 
 var registry *Registry
 
 func Create() {
+
+	// Create connection for outgoing pings
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		log.Fatal("Failed to listen for ICMP packets:", err)
 	}
 
+	// Initialize registry
 	registry = &Registry{
-		Endpoints:     make(map[int]string),
-		PingsSent:     make([]Ping, 0),
-		PingsRecieved: make([]Ping, 0),
-		HistorySize:   100,
-		Sequence:      0,
-		Connection:    conn,
+		Endpoints:    make(map[int]string),
+		PendingPings: make([]Ping, 0),
+		Sequence:     0,
+		Connection:   conn,
 	}
 
+	// Add endpoints
 	for _, endpoint := range config.Config.Endpoints {
 		registry.AddEndpoint(endpoint)
 	}
@@ -65,10 +64,12 @@ func (r *Registry) StartLostPingWatcher() error {
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
-			for _, ping := range r.PingsSent {
+			for _, ping := range r.PendingPings {
 				if ping.IsLost() {
 					log.Println("Ping", ping.Sequence, "to", ping.DestinationIP, "is lost")
-					r.RemovePingFromSent(ping)
+
+					// Remove ping from pending list
+					r.RemovePingFromPending(&ping)
 
 					// Update metrics
 					reporting.LostPingsCounter.With(
@@ -102,8 +103,8 @@ func (r *Registry) StartEndpointPinger() error {
 				// Send ping
 				ping.Send()
 
-				// Add ping to sent list
-				r.PingsSent = append(r.PingsSent, ping)
+				// Add ping to pending list
+				r.PendingPings = append(r.PendingPings, ping)
 
 				// Update metrics
 				reporting.SentPingsCounter.With(
@@ -158,7 +159,9 @@ func (r *Registry) HandleEchoReply(message *icmp.Message, host string) {
 		log.Println("Received unexpected ping:", ping)
 	}
 	ping.SetAsRecieved()
-	r.MoveFromSentToRecieved(*ping)
+
+	// Remove ping from pending list
+	r.RemovePingFromPending(ping)
 
 	// Update metrics
 	reporting.RttGauge.With(
@@ -174,7 +177,7 @@ func (r *Registry) MatchReplyMessageToSentPing(message *icmp.Message) *Ping {
 	id := int(body.ID)
 	seq := int(body.Seq)
 
-	for _, ping := range r.PingsSent {
+	for _, ping := range r.PendingPings {
 		if ping.EndpointID == id && ping.Sequence == seq {
 			return &ping
 		}
@@ -182,30 +185,12 @@ func (r *Registry) MatchReplyMessageToSentPing(message *icmp.Message) *Ping {
 	return nil
 }
 
-func (r *Registry) MoveFromSentToRecieved(ping Ping) error {
-	if err := r.RemovePingFromSent(ping); err != nil {
-		return err
-	}
-	if err := r.AddPingToRecieved(ping); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *Registry) RemovePingFromSent(p Ping) error {
-	for i, ping := range r.PingsSent {
-		if ping.EndpointID == p.EndpointID && ping.Sequence == p.Sequence {
-			r.PingsSent = append(r.PingsSent[:i], r.PingsSent[i+1:]...)
-			return nil
+func (r *Registry) RemovePingFromPending(ping *Ping) {
+	for i, p := range r.PendingPings {
+		if p.Sequence == ping.Sequence && p.EndpointID == ping.EndpointID {
+			r.PendingPings = append(r.PendingPings[:i], r.PendingPings[i+1:]...)
+			log.Println("len(r.PendingPings)", len(r.PendingPings))
+			return
 		}
 	}
-	return errors.New("could not find ping to remove")
-}
-
-func (r *Registry) AddPingToRecieved(p Ping) error {
-	if len(r.PingsRecieved) == r.HistorySize {
-		r.PingsRecieved = r.PingsRecieved[1:]
-	}
-	r.PingsRecieved = append(r.PingsRecieved, p)
-	return nil
 }
