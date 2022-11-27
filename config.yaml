@@ -32,11 +32,3 @@ endpoints:
     hostname: open_dns_2
     address: 208.67.220.220
     location: san_francisco_ca
-  -
-    hostname: cyber_ghost_dns_1
-    address: 38.132.106.139
-    location: new_york_ny
-  -
-    hostname: cyber_ghost_dns_2
-    address: 194.187.251.67
-    location: new_york_ny
