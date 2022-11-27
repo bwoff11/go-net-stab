@@ -4,10 +4,8 @@ interval: 1
 timeout: 3
 # Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
 port: 3009
-# Local node information for reporting to prometheus
-node:
-  hostname: "node1"
-  location: "home"
+# Name of host running service for prometheus metrics
+localhost: home
 # List of hosts to ping
 endpoints:
   - 
@@ -17,4 +15,8 @@ endpoints:
   - 
     hostname: google_dns
     address: 8.8.8.8
+    location: mountain_view_ca
+  -
+    hostname: google_dns2
+    address: 8.8.4.4
     location: mountain_view_ca
