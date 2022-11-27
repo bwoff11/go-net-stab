@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/bwoff11/go-net-stab/internal/config"
-	"github.com/bwoff11/go-net-stab/internal/reporting"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -22,16 +20,9 @@ type Ping struct {
 	RoundTripTime float64
 }
 
-func CreatePing(endpointID int, sequence int) Ping {
-	return Ping{
-		EndpointID:    endpointID,
-		Sequence:      sequence,
-		SourceIP:      registry.Connection.LocalAddr().String(),
-		DestinationIP: registry.Endpoints[endpointID],
-	}
-}
-
 func (p *Ping) Send() error {
+
+	// Create ICMP message
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho, Code: 0,
 		Body: &icmp.Echo{
@@ -40,24 +31,19 @@ func (p *Ping) Send() error {
 			Data: []byte("We've been trying to reach you about your car's extended warranty"),
 		},
 	}
+
+	// Marshal ICMP message
 	bytes, err := msg.Marshal(nil)
 	if err != nil {
 		log.Fatalln("Error marshalling payload:", err)
 		return nil
 	}
 
+	// Send ICMP message
 	if _, err := registry.Connection.WriteTo(bytes, &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
 		return err
 	}
 	p.SentAt = time.Now()
-
-	// Update Metrics
-	reporting.SentPingsCounter.With(
-		prometheus.Labels{
-			"source_ip":      p.SourceIP,
-			"destination_ip": p.DestinationIP,
-		},
-	).Inc()
 
 	return nil
 }

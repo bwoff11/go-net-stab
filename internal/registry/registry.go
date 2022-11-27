@@ -90,10 +90,28 @@ func (r *Registry) StartEndpointPinger() error {
 		for {
 			log.Println("Sending pings for sequence", r.Sequence)
 			for id := range r.Endpoints {
-				ping := CreatePing(id, r.Sequence)
+
+				// Create ping
+				ping := Ping{
+					EndpointID:    id,
+					Sequence:      r.Sequence,
+					SourceIP:      registry.Connection.LocalAddr().String(),
+					DestinationIP: registry.Endpoints[id],
+				}
+
+				// Send ping
 				ping.Send()
+
+				// Add ping to sent list
 				r.PingsSent = append(r.PingsSent, ping)
-				log.Println("Sent ping", ping.Sequence, "to", ping.DestinationIP)
+
+				// Update metrics
+				reporting.SentPingsCounter.With(
+					prometheus.Labels{
+						"source_ip":      ping.SourceIP,
+						"destination_ip": ping.DestinationIP,
+					},
+				).Inc()
 			}
 			r.Sequence++
 			time.Sleep(time.Duration(interval) * time.Second)
