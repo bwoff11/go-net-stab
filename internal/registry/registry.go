@@ -21,13 +21,15 @@ type Registry struct {
 	Connection    *icmp.PacketConn
 }
 
-func Create() Registry {
+var registry *Registry
+
+func Create() {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		log.Fatal("Failed to listen for ICMP packets:", err)
 	}
 
-	return Registry{
+	registry = &Registry{
 		Endpoints:     make(map[int]string),
 		PingsSent:     make([]Ping, 0),
 		PingsRecieved: make([]Ping, 0),
@@ -35,24 +37,28 @@ func Create() Registry {
 		Sequence:      0,
 		Connection:    conn,
 	}
+
+	for _, endpoint := range config.Config.Endpoints {
+		registry.AddEndpoint(endpoint)
+	}
+}
+
+func Start() {
+	if err := registry.StartListener(); err != nil {
+		log.Fatal("Failed to start listener:", err)
+	}
+	if err := registry.StartEndpointPinger(); err != nil {
+		log.Fatal("Failed to start endpoint pinger:", err)
+	}
+	if err := registry.StartLostPingWatcher(); err != nil {
+		log.Fatal("Failed to start lost ping watcher:", err)
+	}
 }
 
 func (r *Registry) AddEndpoint(endpoint string) {
 	len := len(r.Endpoints)
 	r.Endpoints[len] = endpoint
 	log.Println("Added endpoint", endpoint, "with ID", len)
-}
-
-func (r *Registry) Run() {
-	if err := r.StartListener(); err != nil {
-		log.Fatal("Failed to start listener:", err)
-	}
-	if err := r.StartEndpointPinger(); err != nil {
-		log.Fatal("Failed to start endpoint pinger:", err)
-	}
-	if err := r.StartLostPingWatcher(); err != nil {
-		log.Fatal("Failed to start lost ping watcher:", err)
-	}
 }
 
 func (r *Registry) StartLostPingWatcher() error {
@@ -83,10 +89,11 @@ func (r *Registry) StartEndpointPinger() error {
 	go func() {
 		for {
 			log.Println("Sending pings for sequence", r.Sequence)
-			for id, ip := range r.Endpoints {
-				ping := CreatePing(id, r.Sequence, ip)
-				ping.Send(r.Connection)
+			for id := range r.Endpoints {
+				ping := CreatePing(id, r.Sequence)
+				ping.Send()
 				r.PingsSent = append(r.PingsSent, ping)
+				log.Println("Sent ping", ping.Sequence, "to", ping.DestinationIP)
 			}
 			r.Sequence++
 			time.Sleep(time.Duration(interval) * time.Second)

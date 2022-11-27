@@ -22,16 +22,16 @@ type Ping struct {
 	RoundTripTime float64
 }
 
-func CreatePing(endpointID int, sequence int, destinationIP string) Ping {
+func CreatePing(endpointID int, sequence int) Ping {
 	return Ping{
 		EndpointID:    endpointID,
 		Sequence:      sequence,
-		SourceIP:      "192.168.1.11",
-		DestinationIP: destinationIP,
+		SourceIP:      registry.Connection.LocalAddr().String(),
+		DestinationIP: registry.Endpoints[endpointID],
 	}
 }
 
-func (p *Ping) Send(conn *icmp.PacketConn) error {
+func (p *Ping) Send() error {
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho, Code: 0,
 		Body: &icmp.Echo{
@@ -46,7 +46,7 @@ func (p *Ping) Send(conn *icmp.PacketConn) error {
 		return nil
 	}
 
-	if _, err := conn.WriteTo(bytes, &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
+	if _, err := registry.Connection.WriteTo(bytes, &net.IPAddr{IP: net.ParseIP(p.DestinationIP)}); err != nil {
 		return err
 	}
 	p.SentAt = time.Now()

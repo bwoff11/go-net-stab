@@ -13,12 +13,8 @@ func main() {
 		log.Fatal("Failed to load config:", err)
 	}
 
-	registry := registry.Create()
-	for _, endpoint := range config.Config.Endpoints {
-		registry.AddEndpoint(endpoint)
-	}
-	registry.Run()
-	defer registry.Connection.Close()
+	registry.Create()
+	registry.Start()
 
 	reporting.ServeMetrics()
 }
