@@ -1,6 +1,11 @@
 # go-net-stab
 Golang Network Stability Monitor (or go-net-stab) lets you easily monitor the network quality and stability to multiple endpoints.
 
+## Quick Start
+1. Download and install the Go programming language from https://golang.org/dl/
+2. Clone this repository
+3. Customize the configuration file (config.json) to your needs
+4. Run the program with `sudo go run .`
 
 ### Prometheus Queries
 
