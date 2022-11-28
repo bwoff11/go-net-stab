@@ -10,18 +10,18 @@ Golang Network Stability Monitor (or go-net-stab) lets you easily monitor the ne
 ### Prometheus Queries
 
 ```bash
-# Min latency - last 5 minutes
-min_over_time(ping_rtt_milliseconds[5m])
+# Min latency
+min_over_time(ping_rtt_milliseconds[1m])
 
-# Max latency - last 5 minutes
-max_over_time(ping_rtt_milliseconds[5m])
+# Max latency
+min_over_time(ping_rtt_milliseconds[1m])
 
-# Average latency - last 5 minutes
-avg_over_time(ping_rtt_milliseconds[5m])
+# Avg Latency
+avg_over_time(ping_rtt_milliseconds[1m])
 
-# Jitter - last 5 minutes
-abs(min_over_time(ping_rtt_milliseconds[1m]) - max_over_time(ping_rtt_milliseconds[1m]))
+# Jitter
+max(ping_rtt_milliseconds) - min(ping_rtt_milliseconds)
 
 # Packet loss - last 5 minutes
-rate(ping_lost_packet_total{}[$__interval]) / rate(ping_sent_packet_total{}[$__interval])
+rate(ping_lost_packet_total[$__rate_interval]) / rate(ping_sent_packet_total[$__rate_interval])
 ```
