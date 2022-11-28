@@ -228,7 +228,7 @@ func createListener() {
 						// Update metrics
 						RttGauge.With(
 							prometheus.Labels{
-								"source_hostname":      config.Endpoints[ping.ID].Hostname,
+								"source_hostname":      config.Localhost,
 								"destination_hostname": config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname,
 								"destination_address":  config.Endpoints[rm.Body.(*icmp.Echo).ID].Address,
 								"destination_location": config.Endpoints[rm.Body.(*icmp.Echo).ID].Location,
