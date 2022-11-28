@@ -20,7 +20,7 @@ min_over_time(ping_rtt_milliseconds[1m])
 avg_over_time(ping_rtt_milliseconds[1m])
 
 # Jitter
-max(ping_rtt_milliseconds) - min(ping_rtt_milliseconds)
+max_over_time(ping_rtt_milliseconds[1m]) - min_over_time(ping_rtt_milliseconds[1m])
 
 # Packet loss - last 5 minutes
 rate(ping_lost_packet_total[$__rate_interval]) / rate(ping_sent_packet_total[$__rate_interval])
