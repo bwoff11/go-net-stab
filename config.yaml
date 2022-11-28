@@ -1,5 +1,5 @@
 # Time in milliseconds between each ping
-interval: 1000
+interval: 3000
 # Time in milliseconds before a ping with no response is considered lost
 timeout: 3500
 # Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
