@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,10 +41,11 @@ var configLocations = []string{
 
 // Global variables used across multiple functions
 var (
-	config *Configuration // holds the current configuration
+	config *Configuration   // holds the current configuration
 	conn   *icmp.PacketConn // ICMP connection used to send and receive pings
 	sent   chan Ping        // channel to keep track of sent pings
 	pending []Ping          // slice to keep track of pings that have been sent but not yet received
+	mutex  sync.Mutex       // mutex for synchronizing access to pending slice
 )
 
 // Ping represents a single ping
@@ -106,8 +108,13 @@ func main() {
 	}
 
 	// Start a goroutine for each endpoint to continuously send pings
+	var wg sync.WaitGroup
 	for i, endpoint := range config.Endpoints {
-		go ping(i, endpoint)
+		wg.Add(1)
+		go func(id int, endpoint Endpoint) {
+			defer wg.Done()
+			ping(id, endpoint)
+		}(i, endpoint)
 	}
 
 	sent = make(chan Ping)
@@ -126,6 +133,8 @@ func main() {
 	prometheus.MustRegister(RttGauge)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+config.Port, nil))
+
+	wg.Wait()
 }
 
 // LoadConfig loads the configuration from a file
@@ -171,6 +180,7 @@ func ping(id int, endpoint Endpoint) {
 				Seq:  sequence,
 				Data: []byte("we've been trying to reach you about your car's extended warranty"),
 			},
+			Src: net.IPv4zero,
 		}
 
 		b, err := m.Marshal(nil)
@@ -223,6 +233,7 @@ func createListener() {
 
 			switch rm.Type {
 			case ipv4.ICMPTypeEchoReply:
+				mutex.Lock()
 				for i, ping := range pending {
 					if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
 						pending = append(pending[:i], pending[i+1:]...)
@@ -238,8 +249,10 @@ func createListener() {
 						).Set(float64(rtt))
 
 						log.Println("Received ping reply from", config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Address, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Location, "with RTT", rtt, "ms")
+						break
 					}
 				}
+				mutex.Unlock()
 			}
 		}
 	}()
@@ -251,7 +264,9 @@ func checkForLostPings() {
 
 	go func() {
 		for range ticker.C {
-			for i, ping := range pending {
+			mutex.Lock()
+			for i := 0; i < len(pending); {
+				ping := pending[i]
 				if time.Since(ping.SentAt) > config.Timeout {
 					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
 
@@ -264,10 +279,13 @@ func checkForLostPings() {
 						},
 					).Inc()
 
-					pending = append(pending[:i], pending[i+1:]...)
-					break
+					pending[i] = pending[len(pending)-1]
+					pending = pending[:len(pending)-1]
+				} else {
+					i++
 				}
 			}
+			mutex.Unlock()
 		}
 	}()
 }
