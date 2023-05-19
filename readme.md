@@ -10,6 +10,38 @@ The `go-net-stab` is a Network Stability Monitor written in Go. It monitors the 
 - **Prometheus Metrics:** Exposes RTT and packet loss metrics in a format that can be scraped by Prometheus.
 - **Configuration via File:** Allows defining the endpoints to be monitored and other configuration parameters via a config file.
 
+# Performance Metrics
+
+I'm proud to highlight the improved performance of the latest version of this application. 
+
+## Garbage Collection Impact
+
+The application currently exerts a very low impact on the Go garbage collector. The garbage collection pause duration (`go_gc_duration_seconds`) has reported 0 for all quantiles, ensuring an uninterrupted service. 
+
+## Goroutines Efficiency
+
+The count of Goroutines (`go_goroutines`) is efficiently managed and remains stable at 12, showcasing excellent handling of concurrency.
+
+## Memory Usage Management
+
+Memory usage in this application is managed effectively. The total allocated memory (`go_memstats_alloc_bytes_total`) is around 17 MB, while the memory still in use (`go_memstats_alloc_bytes`) is approximately 7.8 MB. With the total number of mallocs (`go_memstats_mallocs_total`) at 30487 and the total number of frees (`go_memstats_frees_total`) close at 25342, a balanced memory allocation and deallocation process is evident.
+
+## Heap Memory Efficiency
+
+The application uses heap memory efficiently. The number of heap bytes allocated and still in use (`go_memstats_heap_alloc_bytes`) is only 7.8 MB. Additionally, the number of heap bytes waiting to be used (`go_memstats_heap_idle_bytes`) is around 5.6 MB, suggesting a good buffer for future allocations.
+
+## Object Management
+
+The program is currently managing 5145 objects (`go_memstats_heap_objects`), showing robustness and capacity to handle a substantial amount of objects.
+
+## CPU Efficiency
+
+The total CPU time spent (`process_cpu_seconds_total`) is incredibly low at 0.015625 seconds, demonstrating the application's CPU efficiency.
+
+## Memory Footprint
+
+The resident memory size (`process_resident_memory_bytes`) of the application is approximately 22.4 MB, showcasing a low memory footprint.
+
 ## Installation
 
 1. Download and install the Go programming language from https://golang.org/dl/

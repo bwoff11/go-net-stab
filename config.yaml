@@ -2,10 +2,10 @@
 interval: 3000
 # Time in milliseconds before a ping with no response is considered lost
 timeout: 3500
-# Port to run the web server on for prometheus metrics. This must match the port in the prometheus config
+# Port to run the web server on for Prometheus metrics. This must match the port in the Prometheus config
 port: 3009
-# Name of host running service for prometheus metrics
-localhost: home
+# Name of host running the service for Prometheus metrics
+localhost: 127.0.0.1
 # List of hosts to ping
 endpoints:
   - 
@@ -16,7 +16,3 @@ endpoints:
     hostname: google_dns
     address: 8.8.8.8
     location: mountain_view_ca
-  - 
-    hostname: open_dns
-    address: 208.67.222.222
-    location: san_francisco_ca
