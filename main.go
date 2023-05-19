@@ -172,6 +172,7 @@ func ping(id int, endpoint Endpoint) {
 	ticker := time.NewTicker(config.Interval)
 
 	for range ticker.C {
+		// Create an ICMP message to send as a ping
 		m := icmp.Message{
 			Type: ipv4.ICMPTypeEcho,
 			Code: 0,
@@ -183,23 +184,27 @@ func ping(id int, endpoint Endpoint) {
 			Src: net.IPv4zero,
 		}
 
+		// Marshal the ICMP message into bytes
 		b, err := m.Marshal(nil)
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		// Send the ping to the endpoint's address
 		_, err = conn.WriteTo(b, &net.IPAddr{IP: net.ParseIP(endpoint.Address)})
 		if err != nil {
 			log.Println("Error sending ping to", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location, ":", err)
 			break
 		}
 
+		// Record the sent ping in the sent channel
 		sent <- Ping{
 			ID:     id,
 			Seq:    sequence,
 			SentAt: time.Now(),
 		}
 
+		// Increment the sent pings counter metric
 		SentPingsCounter.With(
 			prometheus.Labels{
 				"source_hostname":      config.Localhost,
@@ -221,11 +226,13 @@ func createListener() {
 		rb := make([]byte, 1500)
 
 		for {
+			// Read incoming ICMP messages
 			n, _, err := conn.ReadFrom(rb)
 			if err != nil {
 				log.Fatal(err)
 			}
 
+			// Parse the received ICMP message
 			rm, err := icmp.ParseMessage(1, rb[:n])
 			if err != nil {
 				log.Fatal(err)
@@ -235,10 +242,14 @@ func createListener() {
 			case ipv4.ICMPTypeEchoReply:
 				mutex.Lock()
 				for i, ping := range pending {
+					// Check if the received ICMP message matches a pending ping
 					if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
+						// Remove the pending ping from the slice
 						pending = append(pending[:i], pending[i+1:]...)
+						// Calculate the round trip time (RTT) in milliseconds
 						rtt := time.Since(ping.SentAt).Milliseconds()
 
+						// Set the RTT value in the RttGauge metric
 						RttGauge.With(
 							prometheus.Labels{
 								"source_hostname":      config.Localhost,
@@ -267,9 +278,11 @@ func checkForLostPings() {
 			mutex.Lock()
 			for i := 0; i < len(pending); {
 				ping := pending[i]
+				// Check if a pending ping has timed out
 				if time.Since(ping.SentAt) > config.Timeout {
 					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
 
+					// Increment the lost pings counter metric
 					LostPingsCounter.With(
 						prometheus.Labels{
 							"source_hostname":      config.Localhost,
@@ -279,6 +292,7 @@ func checkForLostPings() {
 						},
 					).Inc()
 
+					// Remove the lost ping from the slice
 					pending[i] = pending[len(pending)-1]
 					pending = pending[:len(pending)-1]
 				} else {
