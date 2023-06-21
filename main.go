@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -15,41 +16,29 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-// Configuration holds all the configuration values
 type Configuration struct {
-	Interval  time.Duration // Time interval in milliseconds between each ping
-	Timeout   time.Duration // Time in milliseconds to wait for a ping response before considering it lost
-	Port      string        // Port for the HTTP server that exposes the metrics
-	Localhost string        // Hostname of the machine where this program is running
-	Endpoints []Endpoint    // List of endpoints to ping
+	Interval  time.Duration
+	Timeout   time.Duration
+	Port      string
+	Localhost string
+	Endpoints []Endpoint
 }
 
-// Endpoint represents each endpoint that will be pinged
 type Endpoint struct {
 	Hostname string
 	Address  string
 	Location string
-	Interval time.Duration // Time interval in milliseconds for this endpoint
+	Interval time.Duration
 }
 
-// List of configuration file locations that will be checked in order
-var configLocations = []string{
-	"/etc/go-net-stab/",
-	"$HOME/.config/go-net-stab/",
-	"$HOME/.go-net-stab",
-	".",
+type PingService struct {
+	Config     *Configuration
+	Connection *icmp.PacketConn
+	Sent       chan Ping
+	Pending    []Ping
+	Mutex      sync.Mutex
 }
 
-// Global variables used across multiple functions
-var (
-	config  *Configuration   // holds the current configuration
-	conn    *icmp.PacketConn // ICMP connection used to send and receive pings
-	sent    chan Ping        // channel to keep track of sent pings
-	pending []Ping           // slice to keep track of pings that have been sent but not yet received
-	mutex   sync.Mutex       // mutex for synchronizing access to pending slice
-)
-
-// Ping represents a single ping
 type Ping struct {
 	ID     int
 	Seq    int
@@ -57,6 +46,19 @@ type Ping struct {
 }
 
 var (
+	SentPingsCounter *prometheus.CounterVec
+	LostPingsCounter *prometheus.CounterVec
+	RttGauge         *prometheus.GaugeVec
+	pingService      *PingService
+	configLocations  = []string{
+		"/etc/go-net-stab/",
+		"$HOME/.config/go-net-stab/",
+		"$HOME/.go-net-stab",
+		".",
+	}
+)
+
+func init() {
 	SentPingsCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ping_sent_packet_total",
@@ -95,94 +97,86 @@ var (
 			"destination_location",
 		},
 	)
-)
 
-func main() {
-	config = &Configuration{}
-	if err := LoadConfig(); err != nil {
-		log.Fatal(err)
-	}
-
-	var err error
-	conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Start a goroutine for each endpoint to continuously send pings
-	var wg sync.WaitGroup
-	for i, endpoint := range config.Endpoints {
-		wg.Add(1)
-		go func(id int, endpoint Endpoint) {
-			defer wg.Done()
-			ping(id, endpoint)
-		}(i, endpoint)
-	}
-
-	sent = make(chan Ping)
-	go func() {
-		for {
-			pending = append(pending, <-sent)
-		}
-	}()
-
-	createListener()
-	checkForLostPings()
-
-	// Register the Prometheus metrics and start the HTTP server to serve the metrics
 	prometheus.MustRegister(SentPingsCounter)
 	prometheus.MustRegister(LostPingsCounter)
 	prometheus.MustRegister(RttGauge)
-	http.Handle("/metrics", promhttp.Handler())
-
-	metricsURL := "http://localhost:" + config.Port + "/metrics"
-	log.Println("Metrics are being exposed at:", metricsURL)
-
-	log.Fatal(http.ListenAndServe(":"+config.Port, nil))
-
-	go func() {
-		wg.Wait()
-		conn.Close()
-	}()
 }
 
-// LoadConfig loads the configuration from a file
-func LoadConfig() error {
-	// Set the name of the config file
+func main() {
+	pingService = &PingService{
+		Config:  &Configuration{},
+		Sent:    make(chan Ping),
+		Pending: []Ping{},
+	}
+
+	if err := pingService.loadConfig(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := pingService.createConnection(); err != nil {
+		log.Fatal(err)
+	}
+
+	pingService.startPingingEndpoints()
+
+	go pingService.appendPendingPings()
+	go pingService.createListener()
+	go pingService.checkForLostPings()
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	metricsURL := fmt.Sprintf("http://localhost:%s/metrics", pingService.Config.Port)
+	log.Printf("Metrics are being exposed at: %s", metricsURL)
+
+	log.Fatal(http.ListenAndServe(":"+pingService.Config.Port, nil))
+}
+
+func (ps *PingService) loadConfig() error {
 	viper.SetConfigName("config")
 
-	// Add all the possible locations of the config file
 	for _, location := range configLocations {
 		viper.AddConfigPath(location)
 	}
 
-	// Try to read the config file
 	if err := viper.ReadInConfig(); err != nil {
 		return errors.New("Fatal error config file: " + err.Error())
 	}
 
-	// Try to unmarshal the config file into the Configuration struct
-	if err := viper.Unmarshal(config); err != nil {
+	if err := viper.Unmarshal(ps.Config); err != nil {
 		return errors.New("Fatal error config file: " + err.Error())
 	}
 
-	// Convert milliseconds to nanoseconds for Interval and Timeout
-	config.Interval *= time.Millisecond
-	config.Timeout *= time.Millisecond
+	ps.Config.Interval *= time.Millisecond
+	ps.Config.Timeout *= time.Millisecond
 
-	// Log all the loaded endpoints
-	for _, endpoint := range config.Endpoints {
-		log.Println("Loaded endpoint", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location)
-	}
-
-	log.Println("Configuration successfully loaded from", viper.ConfigFileUsed())
 	return nil
 }
 
-// ping continuously sends pings to an endpoint
-func ping(id int, endpoint Endpoint) {
+func (ps *PingService) createConnection() error {
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return err
+	}
+
+	ps.Connection = conn
+	return nil
+}
+
+func (ps *PingService) startPingingEndpoints() {
+	var wg sync.WaitGroup
+	for i, endpoint := range ps.Config.Endpoints {
+		wg.Add(1)
+		go func(id int, endpoint Endpoint) {
+			defer wg.Done()
+			ps.pingEndpoint(id, endpoint)
+		}(i, endpoint)
+	}
+}
+
+func (ps *PingService) pingEndpoint(id int, endpoint Endpoint) {
 	sequence := 0
-	ticker := time.NewTicker(config.Interval)
+	ticker := time.NewTicker(ps.Config.Interval)
 
 	for range ticker.C {
 		m := icmp.Message{
@@ -200,106 +194,98 @@ func ping(id int, endpoint Endpoint) {
 			log.Fatal(err)
 		}
 
-		_, err = conn.WriteTo(b, &net.IPAddr{IP: net.ParseIP(endpoint.Address)})
+		_, err = ps.Connection.WriteTo(b, &net.IPAddr{IP: net.ParseIP(endpoint.Address)})
 		if err != nil {
-			log.Println("Error sending ping to", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location, ":", err)
+			log.Printf("Error sending ping to %s at %s in %s: %v", endpoint.Hostname, endpoint.Address, endpoint.Location, err)
 			break
 		}
 
-		sent <- Ping{
+		ps.Sent <- Ping{
 			ID:     id,
 			Seq:    sequence,
 			SentAt: time.Now(),
 		}
 
-		SentPingsCounter.With(
-			prometheus.Labels{
-				"source_hostname":      config.Localhost,
-				"destination_hostname": endpoint.Hostname,
-				"destination_address":  endpoint.Address,
-				"destination_location": endpoint.Location,
-			},
+		SentPingsCounter.WithLabelValues(
+			ps.Config.Localhost,
+			endpoint.Hostname,
+			endpoint.Address,
+			endpoint.Location,
 		).Inc()
 
 		sequence++
-
-		log.Println("Sent ping to", endpoint.Hostname, "at", endpoint.Address, "at", endpoint.Location)
 	}
 }
 
-// createListener listens for incoming ICMP echo replies
-func createListener() {
-	rb := make([]byte, 1500)
-
-	go func() {
-		for {
-			n, _, err := conn.ReadFrom(rb)
-			if err != nil {
-				log.Println("Error reading ICMP reply:", err)
-				continue
-			}
-
-			rm, err := icmp.ParseMessage(1, rb[:n])
-			if err != nil {
-				log.Println("Error parsing ICMP message:", err)
-				continue
-			}
-
-			switch rm.Type {
-			case ipv4.ICMPTypeEchoReply:
-				mutex.Lock()
-				for i, ping := range pending {
-					if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
-						pending = append(pending[:i], pending[i+1:]...)
-						rtt := time.Since(ping.SentAt).Milliseconds()
-
-						RttGauge.With(
-							prometheus.Labels{
-								"source_hostname":      config.Localhost,
-								"destination_hostname": config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname,
-								"destination_address":  config.Endpoints[rm.Body.(*icmp.Echo).ID].Address,
-								"destination_location": config.Endpoints[rm.Body.(*icmp.Echo).ID].Location,
-							},
-						).Set(float64(rtt))
-
-						log.Println("Received ping reply from", config.Endpoints[rm.Body.(*icmp.Echo).ID].Hostname, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Address, "at", config.Endpoints[rm.Body.(*icmp.Echo).ID].Location, "with RTT", rtt, "ms")
-						break
-					}
-				}
-				mutex.Unlock()
-			}
-		}
-	}()
+func (ps *PingService) appendPendingPings() {
+	for {
+		ps.Pending = append(ps.Pending, <-ps.Sent)
+	}
 }
 
-// checkForLostPings checks the pending slice for lost pings
-func checkForLostPings() {
-	ticker := time.NewTicker(50 * time.Millisecond)
+func (ps *PingService) createListener() {
+	rb := make([]byte, 1500)
 
-	go func() {
-		for range ticker.C {
-			mutex.Lock()
-			for i := 0; i < len(pending); {
-				ping := pending[i]
-				if time.Since(ping.SentAt) > config.Timeout {
-					log.Println("Ping to", config.Endpoints[ping.ID].Hostname, "at", config.Endpoints[ping.ID].Address, "in", config.Endpoints[ping.ID].Location, "timed out")
-
-					LostPingsCounter.With(
-						prometheus.Labels{
-							"source_hostname":      config.Localhost,
-							"destination_hostname": config.Endpoints[ping.ID].Hostname,
-							"destination_address":  config.Endpoints[ping.ID].Address,
-							"destination_location": config.Endpoints[ping.ID].Location,
-						},
-					).Inc()
-
-					pending[i] = pending[len(pending)-1]
-					pending = pending[:len(pending)-1]
-				} else {
-					i++
-				}
-			}
-			mutex.Unlock()
+	for {
+		n, _, err := ps.Connection.ReadFrom(rb)
+		if err != nil {
+			log.Printf("Error reading ICMP reply: %v", err)
+			continue
 		}
-	}()
+
+		rm, err := icmp.ParseMessage(1, rb[:n])
+		if err != nil {
+			log.Printf("Error parsing ICMP message: %v", err)
+			continue
+		}
+
+		if rm.Type == ipv4.ICMPTypeEchoReply {
+			ps.processPingReply(rm)
+		}
+	}
+}
+
+func (ps *PingService) processPingReply(rm *icmp.Message) {
+	ps.Mutex.Lock()
+	defer ps.Mutex.Unlock()
+
+	for i, ping := range ps.Pending {
+		if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
+			ps.Pending = append(ps.Pending[:i], ps.Pending[i+1:]...)
+
+			rtt := float64(time.Since(ping.SentAt).Milliseconds())
+
+			RttGauge.WithLabelValues(
+				ps.Config.Localhost,
+				ps.Config.Endpoints[ping.ID].Hostname,
+				ps.Config.Endpoints[ping.ID].Address,
+				ps.Config.Endpoints[ping.ID].Location,
+			).Set(rtt)
+
+			break
+		}
+	}
+}
+
+func (ps *PingService) checkForLostPings() {
+	ticker := time.NewTicker(ps.Config.Timeout)
+
+	for range ticker.C {
+		ps.Mutex.Lock()
+
+		for i, ping := range ps.Pending {
+			if time.Since(ping.SentAt) > ps.Config.Timeout {
+				ps.Pending = append(ps.Pending[:i], ps.Pending[i+1:]...)
+
+				LostPingsCounter.WithLabelValues(
+					ps.Config.Localhost,
+					ps.Config.Endpoints[ping.ID].Hostname,
+					ps.Config.Endpoints[ping.ID].Address,
+					ps.Config.Endpoints[ping.ID].Location,
+				).Inc()
+			}
+		}
+
+		ps.Mutex.Unlock()
+	}
 }
