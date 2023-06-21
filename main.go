@@ -134,6 +134,10 @@ func main() {
 	prometheus.MustRegister(LostPingsCounter)
 	prometheus.MustRegister(RttGauge)
 	http.Handle("/metrics", promhttp.Handler())
+
+	metricsURL := "http://localhost:" + config.Port + "/metrics"
+	log.Println("Metrics are being exposed at:", metricsURL)
+
 	log.Fatal(http.ListenAndServe(":"+config.Port, nil))
 
 	go func() {
