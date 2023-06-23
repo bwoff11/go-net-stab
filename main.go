@@ -1,11 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 var pinger *Pinger
@@ -17,6 +16,7 @@ func main() {
 	// The RegisterMetrics() function from the metrics package then registers these metrics with Prometheus
 	metrics := NewMetrics()
 	metrics.RegisterMetrics()
+	log.Info("Initialized and registered metrics")
 
 	// Initialize the pinger and the listener
 	// The pinger is responsible for sending ICMP Echo Requests to the specified endpoints
@@ -34,6 +34,7 @@ func main() {
 		pending:  make(map[int]Ping),
 		Metrics:  metrics,
 	}
+	log.Info("Initialized pinger and listener")
 
 	// Establish ICMP connection
 	// The createConnection() function from the pinger package creates a new ICMP connection that will be used to send Echo Requests and receive Echo Replies
@@ -42,6 +43,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating ICMP connection: %v", err)
 	}
+	log.Info("Established ICMP connection")
 
 	// Load the configuration
 	if err := pinger.loadConfig(); err != nil {
@@ -60,10 +62,11 @@ func main() {
 	go pinger.startPingingEndpoints()
 	go listener.listenForPings()
 
+	log.Info("Started pinging and listening processes")
+
 	// Expose the metrics endpoint
 	// The /metrics endpoint is where Prometheus will scrape the metrics data from
 	// The promhttp.Handler() function from the Prometheus client library provides a HTTP handler to expose the registered metrics
 	http.Handle("/metrics", promhttp.Handler())
-	fmt.Println("Server is listening on port 2112...")
 	log.Fatal(http.ListenAndServe(":3009", nil))
 }

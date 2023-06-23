@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -22,6 +22,7 @@ type Listener struct {
 // ICMP Echo Requests. If a Reply is not received for a particular Request within the
 // specified timeout, that Request is considered as lost.
 func (l *Listener) listenForPings() {
+	log.Info("Started listening for pings")
 	go l.receivePings() // calling receivePings in a separate goroutine
 
 	ticker := time.NewTicker(l.pinger.Config.Timeout)
@@ -37,12 +38,12 @@ func (l *Listener) receivePings() {
 	for {
 		n, _, err := pinger.Connection.ReadFrom(packet)
 		if err != nil {
-			log.Fatalf("Error receiving ICMP packet: %v", err)
+			log.Error("Error reading from ICMP connection: ", err)
 		}
 
 		message, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), packet[:n])
 		if err != nil {
-			log.Printf("Error parsing ICMP message: %v", err)
+			log.Error("Error parsing ICMP message: ", err)
 			continue
 		}
 
@@ -62,6 +63,16 @@ func (l *Listener) receivePings() {
 			if ok {
 				receivedPing.SentAt = sentPing.SentAt
 				l.received <- receivedPing
+				log.WithFields(log.Fields{
+					"ID":     receivedPing.ID,
+					"Seq":    receivedPing.Seq,
+					"SentAt": receivedPing.SentAt,
+				}).Info("Received ping")
+			} else {
+				log.WithFields(log.Fields{
+					"ID":  receivedPing.ID,
+					"Seq": receivedPing.Seq,
+				}).Error("Received ping but no corresponding request found")
 			}
 		}
 	}
@@ -80,6 +91,12 @@ func (l *Listener) checkForLostPings() {
 				l.pinger.Config.Endpoints[ping.ID].Address,
 				l.pinger.Config.Endpoints[ping.ID].Location,
 			).Inc()
+
+			log.WithFields(log.Fields{
+				"ID":     ping.ID,
+				"Seq":    ping.Seq,
+				"SentAt": ping.SentAt,
+			}).Error("Lost ping")
 
 			delete(l.pending, id)
 		}
