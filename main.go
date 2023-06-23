@@ -28,12 +28,8 @@ func main() {
 		Metrics: metrics,
 	}
 
-	listener = &Listener{
-		pinger:   pinger,
-		received: make(chan Ping, 100), // Buffered channel to prevent blocking
-		pending:  make(map[int]Ping),
-		Metrics:  metrics,
-	}
+	listener := NewListener(pinger)
+	listener.Start()
 	log.Info("Initialized pinger and listener")
 
 	// Establish ICMP connection
@@ -55,12 +51,8 @@ func main() {
 		log.Fatal("Invalid Timeout in the configuration. It should be a positive value.")
 	}
 
-	// Start the pinging and listening processes
-	// The startPingingEndpoints() function from the pinger package starts the process of sending ICMP Echo Requests to the specified endpoints
-	// The listenForPings() function from the listener package starts the process of receiving ICMP Echo Replies and matching them to their corresponding Requests
-	// Both functions run in separate goroutines to enable concurrent execution
+	// Start the pinging aprocesses
 	go pinger.startPingingEndpoints()
-	go listener.listenForPings()
 
 	log.Info("Started pinging and listening processes")
 

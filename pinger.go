@@ -2,10 +2,11 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -81,6 +82,7 @@ func (p *Pinger) startPingingEndpoints() {
 			p.pingEndpoint(id, endpoint)
 		}(i, endpoint)
 	}
+	wg.Wait() // Add this to wait for all goroutines to finish
 }
 
 func (p *Pinger) pingEndpoint(id int, endpoint Endpoint) {
@@ -92,7 +94,7 @@ func (p *Pinger) pingEndpoint(id int, endpoint Endpoint) {
 			Type: ipv4.ICMPTypeEcho,
 			Code: 0,
 			Body: &icmp.Echo{
-				ID:   id,
+				ID:   id, // Use `id` for Echo ID
 				Seq:  sequence,
 				Data: []byte("we've been trying to reach you about your car's extended warranty"),
 			},
@@ -109,11 +111,17 @@ func (p *Pinger) pingEndpoint(id int, endpoint Endpoint) {
 			break
 		}
 
-		p.Sent <- Ping{
-			ID:     id,
+		sentPing := Ping{
+			ID:     m.Body.(*icmp.Echo).ID, // Use Echo ID as Ping ID
 			Seq:    sequence,
 			SentAt: time.Now(),
 		}
+		p.Sent <- sentPing
+
+		log.WithFields(log.Fields{
+			"ID":  sentPing.ID,
+			"Seq": sequence,
+		}).Info("Sent ping")
 
 		p.Metrics.SentPingsCounter.WithLabelValues(
 			p.Config.Localhost,

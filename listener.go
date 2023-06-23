@@ -18,17 +18,30 @@ type Listener struct {
 	Metrics  *Metrics
 }
 
-// listenForPings function listens for ICMP Echo Replies and matches them to their corresponding
-// ICMP Echo Requests. If a Reply is not received for a particular Request within the
-// specified timeout, that Request is considered as lost.
-func (l *Listener) listenForPings() {
+// NewListener initializes a new Listener.
+func NewListener(p *Pinger) *Listener {
+	return &Listener{
+		pinger:   p,
+		received: make(chan Ping, 100), // adjust buffer size as necessary
+		pending:  make(map[int]Ping),
+		Metrics:  p.Metrics, // assuming it's shared with the Pinger
+	}
+}
+
+// Start function starts listening for sent and received pings.
+func (l *Listener) Start() {
 	log.Info("Started listening for pings")
-	go l.receivePings() // calling receivePings in a separate goroutine
+	go l.handleSentPings()   // Handle sent pings
+	go l.receivePings()      // Handle received pings
+	go l.checkForLostPings() // check for lost pings
+}
 
-	ticker := time.NewTicker(l.pinger.Config.Timeout)
-
-	for range ticker.C {
-		l.checkForLostPings()
+// handleSentPings function receives sent pings from the Sent channel and adds them to the pending map.
+func (l *Listener) handleSentPings() {
+	for sentPing := range l.pinger.Sent {
+		l.mu.Lock()
+		l.pending[sentPing.ID] = sentPing
+		l.mu.Unlock()
 	}
 }
 
@@ -36,7 +49,7 @@ func (l *Listener) listenForPings() {
 func (l *Listener) receivePings() {
 	packet := make([]byte, 1500)
 	for {
-		n, _, err := pinger.Connection.ReadFrom(packet)
+		n, _, err := l.pinger.Connection.ReadFrom(packet)
 		if err != nil {
 			log.Error("Error reading from ICMP connection: ", err)
 		}
@@ -99,6 +112,10 @@ func (l *Listener) checkForLostPings() {
 			}).Error("Lost ping")
 
 			delete(l.pending, id)
+			log.WithFields(log.Fields{
+				"ID":  id,
+				"Seq": ping.Seq,
+			}).Info("Removed pending ping")
 		}
 	}
 }
