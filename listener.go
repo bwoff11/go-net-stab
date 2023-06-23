@@ -81,6 +81,13 @@ func (l *Listener) receivePings() {
 				l.pinger.Config.Endpoints[receivedPing.ID].Location,
 			).Inc()
 
+			l.Metrics.RttGauge.WithLabelValues(
+				l.pinger.Config.Localhost,
+				l.pinger.Config.Endpoints[receivedPing.ID].Hostname,
+				l.pinger.Config.Endpoints[receivedPing.ID].Address,
+				l.pinger.Config.Endpoints[receivedPing.ID].Location,
+			).Set(float64(time.Since(sentPing.SentAt).Nanoseconds()) / 1000000)
+
 			if ok {
 				receivedPing.SentAt = sentPing.SentAt
 				l.received <- receivedPing
