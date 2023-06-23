@@ -72,6 +72,9 @@ func (l *Listener) receivePings() {
 
 			l.mu.Lock()
 			sentPing, ok := l.pending[receivedPing.ID]
+
+			// Delete the received ping from the pending map
+			delete(l.pending, receivedPing.ID)
 			l.mu.Unlock()
 
 			l.Metrics.ReceivedPingsCounter.WithLabelValues(
@@ -92,9 +95,12 @@ func (l *Listener) receivePings() {
 				receivedPing.SentAt = sentPing.SentAt
 				l.received <- receivedPing
 				log.WithFields(log.Fields{
-					"ID":     receivedPing.ID,
-					"Seq":    receivedPing.Seq,
-					"SentAt": receivedPing.SentAt,
+					"ID":       receivedPing.ID,
+					"Seq":      receivedPing.Seq,
+					"SentAt":   receivedPing.SentAt,
+					"Rtt":      time.Since(sentPing.SentAt).Nanoseconds() / 1000000,
+					"Hostname": l.pinger.Config.Endpoints[receivedPing.ID].Hostname,
+					"Address":  l.pinger.Config.Endpoints[receivedPing.ID].Address,
 				}).Info("Received ping")
 			} else {
 				log.WithFields(log.Fields{
@@ -108,29 +114,30 @@ func (l *Listener) receivePings() {
 
 // checkForLostPings function checks for any lost pings
 func (l *Listener) checkForLostPings() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	ticker := time.NewTicker(time.Second)
 
-	for id, ping := range l.pending {
-		if time.Since(ping.SentAt) > l.pinger.Config.Timeout {
-			l.Metrics.LostPingsCounter.WithLabelValues(
-				l.pinger.Config.Localhost,
-				l.pinger.Config.Endpoints[ping.ID].Hostname,
-				l.pinger.Config.Endpoints[ping.ID].Address,
-				l.pinger.Config.Endpoints[ping.ID].Location,
-			).Inc()
+	for range ticker.C {
+		l.mu.Lock()
 
-			log.WithFields(log.Fields{
-				"ID":     ping.ID,
-				"Seq":    ping.Seq,
-				"SentAt": ping.SentAt,
-			}).Error("Lost ping")
+		for id, ping := range l.pending {
+			if time.Since(ping.SentAt) > l.pinger.Config.Timeout {
+				l.Metrics.LostPingsCounter.WithLabelValues(
+					l.pinger.Config.Localhost,
+					l.pinger.Config.Endpoints[ping.ID].Hostname,
+					l.pinger.Config.Endpoints[ping.ID].Address,
+					l.pinger.Config.Endpoints[ping.ID].Location,
+				).Inc()
 
-			delete(l.pending, id)
-			log.WithFields(log.Fields{
-				"ID":  id,
-				"Seq": ping.Seq,
-			}).Info("Removed pending ping")
+				log.WithFields(log.Fields{
+					"ID":     ping.ID,
+					"Seq":    ping.Seq,
+					"SentAt": ping.SentAt,
+				}).Error("Lost ping")
+
+				delete(l.pending, id)
+			}
 		}
+
+		l.mu.Unlock()
 	}
 }
