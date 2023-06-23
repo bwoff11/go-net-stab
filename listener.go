@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -15,7 +16,7 @@ type Listener struct {
 	received chan Ping
 	pending  map[int]Ping
 	mu       sync.Mutex
-	Metrics  *Metrics
+	Metrics  *metrics.Metrics
 }
 
 // NewListener initializes a new Listener.

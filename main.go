@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
@@ -14,7 +15,7 @@ func main() {
 	// Initialize and register metrics
 	// NewMetrics() is a function from the metrics package that initializes a new Metrics struct
 	// The RegisterMetrics() function from the metrics package then registers these metrics with Prometheus
-	metrics := NewMetrics()
+	metrics := metrics.New()
 	metrics.RegisterMetrics()
 	log.Info("Initialized and registered metrics")
 

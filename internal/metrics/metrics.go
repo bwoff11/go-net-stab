@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,7 +12,7 @@ type Metrics struct {
 }
 
 // NewMetrics initializes and returns a new Metrics structure
-func NewMetrics() *Metrics {
+func New() *Metrics {
 	// Initialize Prometheus metrics
 	return &Metrics{
 		SentPingsCounter: prometheus.NewCounterVec(

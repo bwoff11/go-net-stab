@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
 	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/net/icmp"
@@ -35,7 +36,7 @@ type Pinger struct {
 	Config     *Configuration
 	Connection *icmp.PacketConn
 	Sent       chan Ping
-	Metrics    *Metrics
+	Metrics    *metrics.Metrics
 }
 
 // Ping structure
