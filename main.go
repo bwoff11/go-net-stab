@@ -1,24 +1,28 @@
 package main
 
 import (
+	config "github.com/bwoff11/go-net-stab/internal/config"
 	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
 	log "github.com/sirupsen/logrus"
 )
 
 var pinger *Pinger
-var listener *Listener
 
 func main() {
+	// Initialize and register metrics
 	metrics := metrics.New()
 	metrics.Register()
 	log.Info("Initialized and registered metrics")
 
+	// Load configuration
+	config := config.New()
+	if err := config.Load(); err != nil {
+		log.Fatalf("Error loading configuration: %v", err)
+	}
+
 	// Initialize the pinger and the listener
-	// The pinger is responsible for sending ICMP Echo Requests to the specified endpoints
-	// The listener is responsible for receiving ICMP Echo Replies and matching them to their corresponding Requests
-	// Both pinger and listener have buffered channels to prevent blocking. The buffer size of 100 is arbitrary and can be adjusted as needed
 	pinger = &Pinger{
-		Config:  &Configuration{},
+		Config:  config,
 		Sent:    make(chan Ping, 100), // Buffered channel to prevent blocking
 		Metrics: metrics,
 	}
@@ -35,11 +39,6 @@ func main() {
 		log.Fatalf("Error creating ICMP connection: %v", err)
 	}
 	log.Info("Established ICMP connection")
-
-	// Load the configuration
-	if err := pinger.loadConfig(); err != nil {
-		log.Fatal(err)
-	}
 
 	// Ensure the Timeout is correctly loaded and it's a positive value
 	if pinger.Config.Timeout <= 0 {

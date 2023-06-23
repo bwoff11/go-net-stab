@@ -1,39 +1,21 @@
 package main
 
 import (
-	"io/ioutil"
 	"net"
 	"sync"
 	"time"
 
+	config "github.com/bwoff11/go-net-stab/internal/config"
 	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
 	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-	"gopkg.in/yaml.v2"
 )
-
-// Configuration structure
-type Configuration struct {
-	Interval  time.Duration `yaml:"interval"`
-	Timeout   time.Duration `yaml:"timeout"`
-	Port      string        `yaml:"port"`
-	Localhost string        `yaml:"localhost"`
-	Endpoints []Endpoint    `yaml:"endpoints"`
-}
-
-// Endpoint structure
-type Endpoint struct {
-	Hostname string        `yaml:"hostname"`
-	Address  string        `yaml:"address"`
-	Location string        `yaml:"location"`
-	Interval time.Duration `yaml:"interval"`
-}
 
 // Pinger structure
 type Pinger struct {
-	Config     *Configuration
+	Config     *config.Configuration
 	Connection *icmp.PacketConn
 	Sent       chan Ping
 	Metrics    *metrics.Metrics
@@ -44,24 +26,6 @@ type Ping struct {
 	ID     int
 	Seq    int
 	SentAt time.Time
-}
-
-func (p *Pinger) loadConfig() error {
-	configFile, err := ioutil.ReadFile("config.yaml")
-	if err != nil {
-		return err
-	}
-
-	err = yaml.Unmarshal(configFile, p.Config)
-	if err != nil {
-		return err
-	}
-
-	// Convert from milliseconds to nanoseconds
-	p.Config.Interval *= time.Millisecond
-	p.Config.Timeout *= time.Millisecond
-
-	return nil
 }
 
 func (p *Pinger) createConnection() error {
@@ -78,7 +42,7 @@ func (p *Pinger) startPingingEndpoints() {
 	var wg sync.WaitGroup
 	for i, endpoint := range p.Config.Endpoints {
 		wg.Add(1)
-		go func(id int, endpoint Endpoint) {
+		go func(id int, endpoint config.Endpoint) {
 			defer wg.Done()
 			p.pingEndpoint(id, endpoint)
 		}(i, endpoint)
@@ -86,9 +50,9 @@ func (p *Pinger) startPingingEndpoints() {
 	wg.Wait() // Add this to wait for all goroutines to finish
 }
 
-func (p *Pinger) pingEndpoint(id int, endpoint Endpoint) {
+func (p *Pinger) pingEndpoint(id int, endpoint config.Endpoint) {
 	sequence := 0
-	ticker := time.NewTicker(p.Config.Interval)
+	ticker := time.NewTicker(time.Millisecond * p.Config.Interval)
 
 	for range ticker.C {
 		m := icmp.Message{
