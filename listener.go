@@ -74,6 +74,13 @@ func (l *Listener) receivePings() {
 			sentPing, ok := l.pending[receivedPing.ID]
 			l.mu.Unlock()
 
+			l.Metrics.ReceivedPingsCounter.WithLabelValues(
+				l.pinger.Config.Localhost,
+				l.pinger.Config.Endpoints[receivedPing.ID].Hostname,
+				l.pinger.Config.Endpoints[receivedPing.ID].Address,
+				l.pinger.Config.Endpoints[receivedPing.ID].Location,
+			).Inc()
+
 			if ok {
 				receivedPing.SentAt = sentPing.SentAt
 				l.received <- receivedPing
