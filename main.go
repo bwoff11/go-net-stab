@@ -1,291 +1,69 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"sync"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/spf13/viper"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
 )
 
-type Configuration struct {
-	Interval  time.Duration
-	Timeout   time.Duration
-	Port      string
-	Localhost string
-	Endpoints []Endpoint
-}
-
-type Endpoint struct {
-	Hostname string
-	Address  string
-	Location string
-	Interval time.Duration
-}
-
-type PingService struct {
-	Config     *Configuration
-	Connection *icmp.PacketConn
-	Sent       chan Ping
-	Pending    []Ping
-	Mutex      sync.Mutex
-}
-
-type Ping struct {
-	ID     int
-	Seq    int
-	SentAt time.Time
-}
-
-var (
-	SentPingsCounter *prometheus.CounterVec
-	LostPingsCounter *prometheus.CounterVec
-	RttGauge         *prometheus.GaugeVec
-	pingService      *PingService
-	configLocations  = []string{
-		"/etc/go-net-stab/",
-		"$HOME/.config/go-net-stab/",
-		"$HOME/.go-net-stab",
-		".",
-	}
-)
-
-func init() {
-	SentPingsCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ping_sent_packet_total",
-			Help: "Total number of packets sent",
-		},
-		[]string{
-			"source_hostname",
-			"destination_hostname",
-			"destination_address",
-			"destination_location",
-		},
-	)
-
-	LostPingsCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ping_lost_packet_total",
-			Help: "Total number of packets lost",
-		},
-		[]string{
-			"source_hostname",
-			"destination_hostname",
-			"destination_address",
-			"destination_location",
-		},
-	)
-
-	RttGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "ping_rtt_milliseconds",
-			Help: "Round trip time in milliseconds",
-		},
-		[]string{
-			"source_hostname",
-			"destination_hostname",
-			"destination_address",
-			"destination_location",
-		},
-	)
-
-	prometheus.MustRegister(SentPingsCounter)
-	prometheus.MustRegister(LostPingsCounter)
-	prometheus.MustRegister(RttGauge)
-}
+var pinger *Pinger
+var listener *Listener
 
 func main() {
-	pingService = &PingService{
+	// Initialize and register metrics
+	// NewMetrics() is a function from the metrics package that initializes a new Metrics struct
+	// The RegisterMetrics() function from the metrics package then registers these metrics with Prometheus
+	metrics := NewMetrics()
+	metrics.RegisterMetrics()
+
+	// Initialize the pinger and the listener
+	// The pinger is responsible for sending ICMP Echo Requests to the specified endpoints
+	// The listener is responsible for receiving ICMP Echo Replies and matching them to their corresponding Requests
+	// Both pinger and listener have buffered channels to prevent blocking. The buffer size of 100 is arbitrary and can be adjusted as needed
+	pinger = &Pinger{
 		Config:  &Configuration{},
-		Sent:    make(chan Ping),
-		Pending: []Ping{},
+		Sent:    make(chan Ping, 100), // Buffered channel to prevent blocking
+		Metrics: metrics,
 	}
 
-	if err := pingService.loadConfig(); err != nil {
-		log.Fatal(err)
+	listener = &Listener{
+		pinger:   pinger,
+		received: make(chan Ping, 100), // Buffered channel to prevent blocking
+		pending:  make(map[int]Ping),
+		Metrics:  metrics,
 	}
 
-	if err := pingService.createConnection(); err != nil {
-		log.Fatal(err)
-	}
-
-	pingService.startPingingEndpoints()
-
-	go pingService.appendPendingPings()
-	go pingService.createListener()
-	go pingService.checkForLostPings()
-
-	http.Handle("/metrics", promhttp.Handler())
-
-	metricsURL := fmt.Sprintf("http://localhost:%s/metrics", pingService.Config.Port)
-	log.Printf("Metrics are being exposed at: %s", metricsURL)
-
-	log.Fatal(http.ListenAndServe(":"+pingService.Config.Port, nil))
-}
-
-func (ps *PingService) loadConfig() error {
-	viper.SetConfigName("config")
-
-	for _, location := range configLocations {
-		viper.AddConfigPath(location)
-	}
-
-	if err := viper.ReadInConfig(); err != nil {
-		return errors.New("Fatal error config file: " + err.Error())
-	}
-
-	if err := viper.Unmarshal(ps.Config); err != nil {
-		return errors.New("Fatal error config file: " + err.Error())
-	}
-
-	ps.Config.Interval *= time.Millisecond
-	ps.Config.Timeout *= time.Millisecond
-
-	return nil
-}
-
-func (ps *PingService) createConnection() error {
-	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	// Establish ICMP connection
+	// The createConnection() function from the pinger package creates a new ICMP connection that will be used to send Echo Requests and receive Echo Replies
+	// If there is any error during this process, the program will terminate
+	err := pinger.createConnection()
 	if err != nil {
-		return err
+		log.Fatalf("Error creating ICMP connection: %v", err)
 	}
 
-	ps.Connection = conn
-	return nil
-}
-
-func (ps *PingService) startPingingEndpoints() {
-	var wg sync.WaitGroup
-	for i, endpoint := range ps.Config.Endpoints {
-		wg.Add(1)
-		go func(id int, endpoint Endpoint) {
-			defer wg.Done()
-			ps.pingEndpoint(id, endpoint)
-		}(i, endpoint)
+	// Load the configuration
+	if err := pinger.loadConfig(); err != nil {
+		log.Fatal(err)
 	}
-}
 
-func (ps *PingService) pingEndpoint(id int, endpoint Endpoint) {
-	sequence := 0
-	ticker := time.NewTicker(ps.Config.Interval)
-
-	for range ticker.C {
-		m := icmp.Message{
-			Type: ipv4.ICMPTypeEcho,
-			Code: 0,
-			Body: &icmp.Echo{
-				ID:   id,
-				Seq:  sequence,
-				Data: []byte("we've been trying to reach you about your car's extended warranty"),
-			},
-		}
-
-		b, err := m.Marshal(nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = ps.Connection.WriteTo(b, &net.IPAddr{IP: net.ParseIP(endpoint.Address)})
-		if err != nil {
-			log.Printf("Error sending ping to %s at %s in %s: %v", endpoint.Hostname, endpoint.Address, endpoint.Location, err)
-			break
-		}
-
-		ps.Sent <- Ping{
-			ID:     id,
-			Seq:    sequence,
-			SentAt: time.Now(),
-		}
-
-		SentPingsCounter.WithLabelValues(
-			ps.Config.Localhost,
-			endpoint.Hostname,
-			endpoint.Address,
-			endpoint.Location,
-		).Inc()
-
-		sequence++
+	// Ensure the Timeout is correctly loaded and it's a positive value
+	if pinger.Config.Timeout <= 0 {
+		log.Fatal("Invalid Timeout in the configuration. It should be a positive value.")
 	}
-}
 
-func (ps *PingService) appendPendingPings() {
-	for {
-		ps.Pending = append(ps.Pending, <-ps.Sent)
-	}
-}
+	// Start the pinging and listening processes
+	// The startPingingEndpoints() function from the pinger package starts the process of sending ICMP Echo Requests to the specified endpoints
+	// The listenForPings() function from the listener package starts the process of receiving ICMP Echo Replies and matching them to their corresponding Requests
+	// Both functions run in separate goroutines to enable concurrent execution
+	go pinger.startPingingEndpoints()
+	go listener.listenForPings()
 
-func (ps *PingService) createListener() {
-	rb := make([]byte, 1500)
-
-	for {
-		n, _, err := ps.Connection.ReadFrom(rb)
-		if err != nil {
-			log.Printf("Error reading ICMP reply: %v", err)
-			continue
-		}
-
-		rm, err := icmp.ParseMessage(1, rb[:n])
-		if err != nil {
-			log.Printf("Error parsing ICMP message: %v", err)
-			continue
-		}
-
-		if rm.Type == ipv4.ICMPTypeEchoReply {
-			ps.processPingReply(rm)
-		}
-	}
-}
-
-func (ps *PingService) processPingReply(rm *icmp.Message) {
-	ps.Mutex.Lock()
-	defer ps.Mutex.Unlock()
-
-	for i, ping := range ps.Pending {
-		if ping.ID == rm.Body.(*icmp.Echo).ID && ping.Seq == rm.Body.(*icmp.Echo).Seq {
-			ps.Pending = append(ps.Pending[:i], ps.Pending[i+1:]...)
-
-			rtt := float64(time.Since(ping.SentAt).Milliseconds())
-
-			RttGauge.WithLabelValues(
-				ps.Config.Localhost,
-				ps.Config.Endpoints[ping.ID].Hostname,
-				ps.Config.Endpoints[ping.ID].Address,
-				ps.Config.Endpoints[ping.ID].Location,
-			).Set(rtt)
-
-			break
-		}
-	}
-}
-
-func (ps *PingService) checkForLostPings() {
-	ticker := time.NewTicker(ps.Config.Timeout)
-
-	for range ticker.C {
-		ps.Mutex.Lock()
-
-		for i, ping := range ps.Pending {
-			if time.Since(ping.SentAt) > ps.Config.Timeout {
-				ps.Pending = append(ps.Pending[:i], ps.Pending[i+1:]...)
-
-				LostPingsCounter.WithLabelValues(
-					ps.Config.Localhost,
-					ps.Config.Endpoints[ping.ID].Hostname,
-					ps.Config.Endpoints[ping.ID].Address,
-					ps.Config.Endpoints[ping.ID].Location,
-				).Inc()
-			}
-		}
-
-		ps.Mutex.Unlock()
-	}
+	// Expose the metrics endpoint
+	// The /metrics endpoint is where Prometheus will scrape the metrics data from
+	// The promhttp.Handler() function from the Prometheus client library provides a HTTP handler to expose the registered metrics
+	http.Handle("/metrics", promhttp.Handler())
+	fmt.Println("Server is listening on port 2112...")
+	log.Fatal(http.ListenAndServe(":3009", nil))
 }
