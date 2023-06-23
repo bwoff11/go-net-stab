@@ -11,11 +11,11 @@ import (
 
 // Configuration structure
 type Configuration struct {
-	Interval  time.Duration `yaml:"interval"`
-	Timeout   time.Duration `yaml:"timeout"`
-	Port      string        `yaml:"port"`
-	Localhost string        `yaml:"localhost"`
-	Endpoints []Endpoint    `yaml:"endpoints"`
+	Interval    time.Duration `yaml:"interval"`
+	Timeout     time.Duration `yaml:"timeout"`
+	MetricsPort string        `yaml:"metrics_port"`
+	Localhost   string        `yaml:"localhost"`
+	Endpoints   []Endpoint    `yaml:"endpoints"`
 }
 
 // Endpoint structure
@@ -53,7 +53,7 @@ func (p *Configuration) Validate() error {
 		return errors.New("timeout must be a positive duration")
 	}
 
-	if p.Port == "" {
+	if p.MetricsPort == "" {
 		return errors.New("port must not be empty")
 	}
 

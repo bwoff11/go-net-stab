@@ -40,5 +40,5 @@ func main() {
 	go pinger.startPingingEndpoints()
 	log.Info("Started pinging and listening processes")
 
-	metrics.Expose("3009")
+	metrics.Expose(config.MetricsPort)
 }

@@ -2,17 +2,57 @@
 interval: 3000
 # Time in milliseconds before a ping with no response is considered lost
 timeout: 3500
-# Port to run the web server on for Prometheus metrics. This must match the port in the Prometheus config
-port: 3009
+# Port to run the web server on for Prometheus metrics.
+metrics_port: 3009
 # Name of host running the service for Prometheus metrics
 localhost: 127.0.0.1
 # List of hosts to ping
 endpoints:
   - 
-    hostname: cloudflare_dns
+    hostname: cloudflare_dns_1
     address: 1.1.1.1
     location: los_angeles_ca
+  -
+    hostname: cloudflare_dns_2
+    address: 1.0.0.1
+    location: los_angeles_ca
   - 
-    hostname: google_dns
+    hostname: google_dns_1
     address: 8.8.8.8
     location: mountain_view_ca
+  -
+    hostname: google_dns_2
+    address: 8.8.4.4
+    location: mountain_view_ca
+  -
+    hostname: open_dns_1
+    address: 208.67.222.222
+    location: los_angeles_ca
+  -
+    hostname: open_dns_2
+    address: 208.67.220.220
+    location: los_angeles_ca
+  -
+    hostname: quad9_dns_1
+    address: 9.9.9.9
+    location: unknown
+  -
+    hostname: quad9_dns_2
+    address: 149.112.112.112
+    location: unknown
+  -
+    hostname: comodo_secure_dns_1
+    address: 8.26.56.26
+    location: unknown
+  -
+    hostname: comodo_secure_dns_2
+    address: 8.20.247.20
+    location: unknown
+  -
+    hostname: cleanbrowsing_dns_1
+    address: 185.228.168.168
+    location: unknown
+  -
+    hostname: cleanbrowsing_dns_2
+    address: 185.228.169.168
+    location: unknown

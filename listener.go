@@ -129,9 +129,11 @@ func (l *Listener) checkForLostPings() {
 				).Inc()
 
 				log.WithFields(log.Fields{
-					"ID":     ping.ID,
-					"Seq":    ping.Seq,
-					"SentAt": ping.SentAt,
+					"ID":       ping.ID,
+					"Seq":      ping.Seq,
+					"SentAt":   ping.SentAt,
+					"Hostname": l.pinger.Config.Endpoints[ping.ID].Hostname,
+					"Address":  l.pinger.Config.Endpoints[ping.ID].Address,
 				}).Error("Lost ping")
 
 				delete(l.pending, id)
