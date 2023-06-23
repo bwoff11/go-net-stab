@@ -23,7 +23,7 @@ type Listener struct {
 func NewListener(p *Pinger) *Listener {
 	return &Listener{
 		pinger:   p,
-		received: make(chan Ping, 100), // adjust buffer size as necessary
+		received: make(chan Ping, 256),
 		pending:  make(map[int]Ping),
 		Metrics:  p.Metrics, // assuming it's shared with the Pinger
 	}

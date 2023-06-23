@@ -21,11 +21,7 @@ func main() {
 	}
 
 	// Initialize the pinger and the listener
-	pinger = &Pinger{
-		Config:  config,
-		Sent:    make(chan Ping, 100), // Buffered channel to prevent blocking
-		Metrics: metrics,
-	}
+	pinger = New(config, metrics)
 
 	listener := NewListener(pinger)
 	listener.Start()
@@ -39,11 +35,6 @@ func main() {
 		log.Fatalf("Error creating ICMP connection: %v", err)
 	}
 	log.Info("Established ICMP connection")
-
-	// Ensure the Timeout is correctly loaded and it's a positive value
-	if pinger.Config.Timeout <= 0 {
-		log.Fatal("Invalid Timeout in the configuration. It should be a positive value.")
-	}
 
 	// Start the pinging aprocesses
 	go pinger.startPingingEndpoints()

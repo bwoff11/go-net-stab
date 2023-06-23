@@ -28,6 +28,14 @@ type Ping struct {
 	SentAt time.Time
 }
 
+func New(config *config.Configuration, metrics *metrics.Metrics) *Pinger {
+	return &Pinger{
+		Config:  config,
+		Sent:    make(chan Ping, 256),
+		Metrics: metrics,
+	}
+}
+
 func (p *Pinger) createConnection() error {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
