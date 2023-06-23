@@ -1,7 +1,11 @@
 package metrics
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Metrics structure holds all the Prometheus metric counters and gauges
@@ -57,8 +61,13 @@ func New() *Metrics {
 }
 
 // RegisterMetrics registers all the Prometheus metrics with the Prometheus default registry
-func (m *Metrics) RegisterMetrics() {
+func (m *Metrics) Register() {
 	prometheus.MustRegister(m.SentPingsCounter)
 	prometheus.MustRegister(m.LostPingsCounter)
 	prometheus.MustRegister(m.RttGauge)
+}
+
+func (m *Metrics) Expose(port string) {
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

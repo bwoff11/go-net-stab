@@ -1,10 +1,7 @@
 package main
 
 import (
-	"net/http"
-
 	metrics "github.com/bwoff11/go-net-stab/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -12,11 +9,8 @@ var pinger *Pinger
 var listener *Listener
 
 func main() {
-	// Initialize and register metrics
-	// NewMetrics() is a function from the metrics package that initializes a new Metrics struct
-	// The RegisterMetrics() function from the metrics package then registers these metrics with Prometheus
 	metrics := metrics.New()
-	metrics.RegisterMetrics()
+	metrics.Register()
 	log.Info("Initialized and registered metrics")
 
 	// Initialize the pinger and the listener
@@ -54,12 +48,7 @@ func main() {
 
 	// Start the pinging aprocesses
 	go pinger.startPingingEndpoints()
-
 	log.Info("Started pinging and listening processes")
 
-	// Expose the metrics endpoint
-	// The /metrics endpoint is where Prometheus will scrape the metrics data from
-	// The promhttp.Handler() function from the Prometheus client library provides a HTTP handler to expose the registered metrics
-	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":3009", nil))
+	metrics.Expose("3009")
 }
