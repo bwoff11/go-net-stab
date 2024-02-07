@@ -10,38 +10,6 @@
 - **Prometheus Metrics:** RTT and packet loss metrics are exposed in a format that can be scraped by Prometheus.
 - **Configuration via File:** Endpoints to be monitored and other configuration parameters can be defined via a config file.
 
-## Performance Metrics
-
-I am delighted to share the performance improvements achieved with the latest version of the application.
-
-### Garbage Collection Impact
-
-The Go garbage collector experiences minimal impact from the application. The garbage collection pause duration (`go_gc_duration_seconds`) reports 0 for all quantiles, ensuring an uninterrupted service. 
-
-### Goroutines Efficiency
-
-The Goroutines (`go_goroutines`) count is efficiently managed and maintains stability at 12, indicating excellent concurrency handling.
-
-### Memory Usage Management
-
-The total allocated memory (`go_memstats_alloc_bytes_total`) for this application is around 17 MB, whereas the memory still in use (`go_memstats_alloc_bytes`) is approximately 7.8 MB. The total number of mallocs (`go_memstats_mallocs_total`) stands at 30487, with the total number of frees (`go_memstats_frees_total`) closely following at 25342, thereby evidencing a balanced memory allocation and deallocation process.
-
-### Heap Memory Efficiency
-
-The application efficiently utilizes heap memory. The number of heap bytes allocated and still in use (`go_memstats_heap_alloc_bytes`) is only 7.8 MB. Moreover, the number of heap bytes waiting to be used (`go_memstats_heap_idle_bytes`) is around 5.6 MB, suggesting an ample buffer for future allocations.
-
-### Object Management
-
-The program currently manages 5145 objects (`go_memstats_heap_objects`), demonstrating the system's robustness and its capacity to handle a significant number of objects.
-
-### CPU Efficiency
-
-The total CPU time spent (`process_cpu_seconds_total`) is impressively low at 0.015625 seconds, highlighting the application's CPU efficiency.
-
-### Memory Footprint
-
-The resident memory size (`process_resident_memory_bytes`) of the application stands at approximately 22.4 MB, underscoring the program's low memory footprint.
-
 ## Installation and Configuration
 
 Follow the steps below to install and configure `go-net-stab`:
